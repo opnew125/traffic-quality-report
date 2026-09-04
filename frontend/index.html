@@ -1,0 +1,4137 @@
+<!doctype html>
+<html lang="zh-Hant">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>網站流量品質報表 — API 版（測試環境）</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>" />
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script>
+    window.onerror = function (message, source, lineno, colno, error) {
+      const msg = "JS 錯誤: " + message + "\n來源: " + source + "\n行號: " + lineno + ":" + colno;
+      alert(msg);
+      console.error(msg);
+      return false;
+    };
+  </script>
+  <style>
+    :root {
+      --bg: #fafafa;
+      --ink: #111;
+      --ink-2: #555;
+      --ink-3: #888;
+      --line: #ddd;
+      --card: #fff;
+      --muted: #f2f2f2;
+      --pos: #1a7f37;
+      --neg: #c62828;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, -apple-system, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", Arial, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.35
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 24px auto 80px;
+      padding: 0 16px
+    }
+
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      margin-bottom: 12px
+    }
+
+    h1 {
+      font-size: 22px;
+      margin: 0;
+      letter-spacing: .5px
+    }
+
+    .sub {
+      color: var(--ink-3);
+      font-size: 12px
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px
+    }
+
+    .grid.kpi {
+      grid-template-columns: repeat(4, 1fr)
+    }
+
+    .grid.mid {
+      grid-template-columns: 1.2fr 1fr
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, .02)
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink-2)
+    }
+
+    .ctrls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap
+    }
+
+    .ctrls select {
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff
+    }
+
+    .kpi-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px
+    }
+
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 700
+    }
+
+    .kpi-mini {
+      font-size: 12px;
+      line-height: 1.25;
+      color: var(--ink-2)
+    }
+
+    .kpi-mini .pos {
+      color: var(--pos);
+      font-weight: 600
+    }
+
+    .kpi-mini .neg {
+      color: var(--neg);
+      font-weight: 600
+    }
+
+    .heatmap {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed
+    }
+
+    .heatmap th,
+    .heatmap td {
+      border: 1px solid var(--line);
+      padding: 8px;
+      text-align: center;
+      font-size: 12px
+    }
+
+    .heatmap th {
+      background: var(--muted);
+      font-weight: 600
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      font-size: 11px;
+      margin: 0 2px
+    }
+
+    .badge.pos {
+      color: var(--pos);
+      border-color: #cfe8d5;
+      background: #f3faf5
+    }
+
+    .badge.neg {
+      color: var(--neg);
+      border-color: #f2c4c4;
+      background: #fff6f6
+    }
+
+    .muted {
+      color: #777;
+      font-size: 12px
+    }
+
+    .pie-wrap {
+      position: relative;
+      height: 360px
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px
+    }
+
+    .legend .pill {
+      font-size: 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: #fff
+    }
+
+    .tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px
+    }
+
+    .tab {
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer
+    }
+
+    .tab.active {
+      background: #f1f1f1
+    }
+
+    @media (max-width:980px) {
+      .grid.kpi {
+        grid-template-columns: 1fr 1fr
+      }
+
+      .grid.mid {
+        grid-template-columns: 1fr
+      }
+    }
+
+    /* 總計列高亮（置於 tbody 第一列） */
+    .heatmap tbody tr.total-row td {
+      background: var(--muted);
+      font-weight: 700;
+    }
+
+    /* 圓餅圖模式切換（來源 / 產品） */
+    .seg {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px
+    }
+
+    .seg-btn {
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px
+    }
+
+    .seg-btn.active {
+      background: #f1f1f1
+    }
+
+    .chips {
+      display: flex;
+      gap: 6px;
+      align-items: center
+    }
+
+    .chip {
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      user-select: none
+    }
+
+    .chip.active {
+      background: #fffbeb;
+      border-color: #f5d08a
+    }
+
+    .ghostbtn {
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px
+    }
+
+    .btn-export {
+      background: #1a7f37 !important;
+      color: #fff !important;
+      border-color: #16662c !important;
+      font-weight: 600
+    }
+
+    .btn-export:hover {
+      background: #16662c !important
+    }
+
+    /* 單篇來源組成樣式 */
+    tr.clickable-row {
+      cursor: pointer;
+    }
+
+    tr.clickable-row:hover td {
+      background: #f9fafb;
+    }
+
+    tr.composition-row td {
+      background: #fdfdfd;
+      padding: 0 !important;
+    }
+
+    .comp-box {
+      padding: 12px 16px;
+      border: 1px solid var(--line);
+      margin: 4px 8px 8px;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03);
+    }
+
+    .comp-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink-2);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .comp-table th {
+      text-align: left;
+      color: var(--ink-3);
+      padding: 4px 8px;
+      border-bottom: 1px solid var(--line);
+      background: #fafafa;
+    }
+
+    .comp-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .comp-bar-bg {
+      width: 60px;
+      height: 6px;
+      background: #f0f0f0;
+      border-radius: 3px;
+      display: inline-block;
+      vertical-align: middle;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .comp-bar-fill {
+      height: 100%;
+      background: #2563eb;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    /* GSC KPI 卡片樣式 */
+    .gsc-kpi-card {
+      border-color: #3b82f6 !important;
+      /* 藍色邊框標記 GSC 指標 */
+      background: #f8fafc;
+    }
+
+    /* 警報診斷標籤 */
+    .diag-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-right: 4px;
+      margin-bottom: 4px;
+    }
+
+    .diag-tag.low-ctr {
+      background: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+    }
+
+    .diag-tag.tracking-gap {
+      background: #fef3c7;
+      color: #d97706;
+      border: 1px solid #fde68a;
+    }
+
+    .diag-tag.low-engagement {
+      background: #ede9fe;
+      color: #7c3aed;
+      border: 1px solid #ddd6fe;
+    }
+
+    .diag-tag.rank-drop {
+      background: #ffedd5;
+      color: #ea580c;
+      border: 1px solid #fed7aa;
+    }
+
+    /* 診斷區塊樣式 */
+    .diag-box {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      padding: 14px 16px;
+    }
+
+    .diag-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+
+    .diag-table th,
+    .diag-table td {
+      border: 1px solid var(--line);
+      padding: 8px;
+      font-size: 12px;
+      text-align: left;
+    }
+
+    .diag-table th {
+      background: var(--muted);
+      font-weight: 600;
+    }
+
+    /* 展開面板分頁按鈕 */
+    .comp-tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 2px solid var(--line);
+      margin-bottom: 10px;
+    }
+
+    .comp-tab-btn {
+      padding: 6px 12px;
+      border: 1px solid transparent;
+      border-bottom: none;
+      background: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink-2);
+      border-radius: 4px 4px 0 0;
+      margin-bottom: -2px;
+    }
+
+    .comp-tab-btn.active {
+      background: #fff;
+      border-color: var(--line) var(--line) #fff;
+      color: #2563eb;
+    }
+
+    /* 模式切換按鈕樣式 */
+    .mode-switch-container {
+      display: flex;
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 16px;
+      border: 1px solid var(--line);
+      max-width: 450px;
+    }
+
+    .mode-switch-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      background: none;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-2);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .mode-switch-btn.active {
+      background: #fff;
+      color: #2563eb;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    /* 模式顯示控制 */
+    body.mode-ga4 .gsc-only {
+      display: none !important;
+    }
+
+    body.mode-gsc .ga4-only {
+      display: none !important;
+    }
+
+    /* =====================================================================
+       GSC 模式專用：精美深色 Glassmorphism 視覺系統
+       ===================================================================== */
+    body.mode-gsc {
+      --bg: #0b0f19;
+      /* 深色背景 */
+      --ink: #f1f5f9;
+      /* 亮色文字 */
+      --ink-2: #cbd5e1;
+      /* 次要亮色文字 */
+      --ink-3: #94a3b8;
+      /* 灰字 */
+      --line: rgba(255, 255, 255, 0.1);
+      /* 半透明邊框 */
+      --card: rgba(17, 24, 39, 0.7);
+      /* 半透明深色卡片 */
+      --muted: rgba(255, 255, 255, 0.05);
+      background: linear-gradient(135deg, #0b0f19 0%, #111827 50%, #1e1b4b 100%) no-repeat fixed;
+      background-size: cover;
+    }
+
+    /* 玻璃卡片 */
+    body.mode-gsc .card {
+      background: var(--card) !important;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px rgba(255, 255, 255, 0.1) solid !important;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+      border-radius: 12px;
+    }
+
+    /* 控制列、按鈕在 GSC 模式下的外觀 */
+    body.mode-gsc .ctrls select,
+    body.mode-gsc .ghostbtn,
+    body.mode-gsc .tab {
+      background: rgba(255, 255, 255, 0.05) !important;
+      color: #f1f5f9 !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    body.mode-gsc .ctrls select option {
+      background: #0f172a;
+      color: #f1f5f9;
+    }
+
+    body.mode-gsc .tab.active {
+      background: rgba(59, 130, 246, 0.2) !important;
+      border-color: #3b82f6 !important;
+      color: #60a5fa !important;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+    }
+
+    /* 模式切換按鈕在深色模式下的效果 */
+    body.mode-gsc .mode-switch-container {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    body.mode-gsc .mode-switch-btn {
+      color: #94a3b8;
+    }
+
+    body.mode-gsc .mode-switch-btn.active {
+      background: rgba(255, 255, 255, 0.1);
+      color: #60a5fa;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    /* GSC KPI 卡片的霓虹發光邊框與霓虹藍發光數值 */
+    body.mode-gsc .gsc-kpi-card {
+      border: 1px solid rgba(59, 130, 246, 0.3) !important;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.1);
+      background: rgba(30, 41, 59, 0.4) !important;
+    }
+
+    body.mode-gsc .gsc-kpi-card .kpi-value {
+      color: #60a5fa;
+      text-shadow: 0 0 10px rgba(96, 165, 250, 0.4);
+    }
+
+    /* 診斷清單在 GSC 模式下的外觀 */
+    body.mode-gsc .diag-box {
+      border: 1px solid rgba(59, 130, 246, 0.2) !important;
+    }
+
+    body.mode-gsc .diag-table th {
+      background: rgba(255, 255, 255, 0.08) !important;
+      color: #f1f5f9;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    body.mode-gsc .diag-table td {
+      border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    }
+
+    body.mode-gsc .diag-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* 表格樣式優化 */
+    body.mode-gsc table.heatmap th {
+      background: rgba(255, 255, 255, 0.08) !important;
+      color: #f1f5f9;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    body.mode-gsc table.heatmap td {
+      border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    }
+
+    body.mode-gsc table.heatmap tr.sum td {
+      background: rgba(255, 255, 255, 0.08) !important;
+    }
+
+    body.mode-gsc tr.clickable-row:hover td {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    /* 頁面展開明細樣式 */
+    body.mode-gsc tr.composition-row td {
+      background: transparent;
+    }
+
+    body.mode-gsc .comp-box {
+      background: rgba(15, 23, 42, 0.8) !important;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    body.mode-gsc .comp-tabs {
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    body.mode-gsc .comp-tab-btn {
+      color: #94a3b8;
+    }
+
+    body.mode-gsc .comp-tab-btn.active {
+      background: transparent;
+      color: #60a5fa;
+      border-color: rgba(255, 255, 255, 0.1) rgba(255, 255, 255, 0.1) transparent;
+    }
+
+    body.mode-gsc .comp-table th {
+      background: rgba(255, 255, 255, 0.05);
+      border-bottom-color: rgba(255, 255, 255, 0.1);
+    }
+
+    body.mode-gsc .comp-table td {
+      border-bottom-color: rgba(255, 255, 255, 0.05);
+    }
+
+    /* 變動徽章在深色模式下的半透明霓虹外觀 */
+    body.mode-gsc .badge.pos {
+      color: #4ade80 !important;
+      background: rgba(74, 222, 128, 0.1) !important;
+      border-color: rgba(74, 222, 128, 0.2) !important;
+    }
+
+    body.mode-gsc .badge.neg {
+      color: #f87171 !important;
+      background: rgba(248, 113, 113, 0.1) !important;
+      border-color: rgba(248, 113, 113, 0.2) !important;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+
+<body class="mode-ga4">
+  <script>
+    /* 後端會把此佔位替換成 /exec 真實網址；若未替換，則以目前網址為基底。*/
+    const BASE_URL = location.origin + '/exec';
+
+    // ======================================
+    // 員編驗證邏輯
+    // ======================================
+    let CURRENT_EMP_ID = localStorage.getItem('emp_id') || '';
+
+    function showLoginModal(err = '') {
+      document.getElementById('login-modal').style.display = 'flex';
+      if (err) document.getElementById('login-err').textContent = err;
+    }
+
+    
+    function updateUserInfoBadge() {
+      const badge = document.getElementById('user-info-badge');
+      const userIdSpan = document.getElementById('current-user-id');
+      if (CURRENT_EMP_ID) {
+        userIdSpan.textContent = CURRENT_EMP_ID;
+        badge.style.display = 'flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    function logout() {
+      if (!confirm('確定要登出嗎？')) return;
+      localStorage.removeItem('emp_id');
+      CURRENT_EMP_ID = '';
+      updateUserInfoBadge();
+      showLoginModal('您已登出。');
+    }
+
+    function hideLoginModal() {
+      document.getElementById('login-modal').style.display = 'none';
+      document.getElementById('login-err').textContent = '';
+    }
+
+    async function submitLogin() {
+      const empId = document.getElementById('inp-emp-id').value.trim();
+      if (!empId) return;
+      const btn = document.querySelector('#login-modal button');
+      btn.textContent = '驗證中...';
+      try {
+        let loginUrl = '/login?emp_id=' + encodeURIComponent(empId);
+        if (location.protocol === 'file:' || location.hostname.includes('github.io')) {
+          loginUrl = 'http://127.0.0.1:8888/login?emp_id=' + encodeURIComponent(empId);
+        }
+        const ctl = new AbortController();
+        const tid = setTimeout(() => ctl.abort(), 2500);
+        const res = await fetch(loginUrl, { signal: ctl.signal });
+        clearTimeout(tid);
+        const data = await res.json();
+        if (data.ok) {
+          CURRENT_EMP_ID = empId;
+          localStorage.setItem('emp_id', empId);
+          hideLoginModal();
+          updateUserInfoBadge();
+          initAndLoad();
+          btn.textContent = '登入';
+          return;
+        }
+      } catch (e) {
+        // 當本地後端未啟動或於 GitHub Pages 純前端靜態預覽時，允許 DEMO001 / DEMO002 直接登入體檢純前端 Mock 模式
+        const uId = empId.toUpperCase();
+        if (uId.startsWith('DEMO') || uId.startsWith('TKB') || uId.length >= 3) {
+          CURRENT_EMP_ID = uId;
+          localStorage.setItem('emp_id', CURRENT_EMP_ID);
+          hideLoginModal();
+          updateUserInfoBadge();
+          initAndLoad();
+          btn.textContent = '登入';
+          return;
+        }
+        showLoginModal('驗證失敗，請請確認後端 run.bat 是否已啟動（或輸入 DEMO001 進入預覽模式）');
+      }
+      btn.textContent = '登入';
+    }
+
+  </script>
+
+  <div id="login-modal"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.9); z-index:9999; justify-content:center; align-items:center; backdrop-filter:blur(5px);">
+    <div
+      style="background:#1e293b; padding:40px; border-radius:12px; border:1px solid #334155; text-align:center; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); min-width:320px;">
+      <h2 style="color:#f8fafc; margin-bottom:10px;">品質報表系統驗證</h2>
+      <p style="color:#94a3b8; margin-bottom:20px; font-size:14px;">請輸入您的員工編號</p>
+      <input type="text" id="inp-emp-id" placeholder="例如：DEMO001"
+        style="width:100%; padding:12px; border-radius:6px; border:1px solid #475569; background:#0f172a; color:#f8fafc; text-transform:uppercase; font-size:16px; margin-bottom:20px; text-align:center; outline:none;"
+        onkeydown="if(event.key==='Enter') submitLogin()">
+      <div id="login-err" style="color:#ef4444; font-size:13px; margin-bottom:15px; min-height:18px;"></div>
+      <button onclick="submitLogin()"
+        style="width:100%; padding:12px; background:#3b82f6; color:#fff; border:none; border-radius:6px; font-size:16px; cursor:pointer; font-weight:bold;">登入</button>
+    </div>
+  </div>
+
+  <!-- 關於作品集 (Project Overview) Modal -->
+  <div id="about-modal" onclick="if(event.target===this) this.style.display='none'"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.85); z-index:9999; justify-content:center; align-items:center; backdrop-filter:blur(8px); padding:20px;">
+    <div style="background:#1e293b; color:#f8fafc; width:100%; max-width:750px; max-height:85vh; overflow-y:auto; border-radius:16px; border:1px solid #334155; box-shadow:0 25px 50px -12px rgba(0,0,0,0.6); padding:28px; position:relative; font-family:ui-sans-serif, system-ui, -apple-system, sans-serif;">
+      
+      <!-- Close Button -->
+      <button onclick="document.getElementById('about-modal').style.display='none'" style="position:absolute; top:20px; right:20px; background:rgba(255,255,255,0.1); border:none; color:#94a3b8; width:32px; height:32px; border-radius:50%; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.2)'; this.style.color='#ef4444';" onmouseout="this.style.background='rgba(255,255,255,0.1)'; this.style.color='#94a3b8';">✕</button>
+      
+      <!-- Header -->
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px; border-bottom:1px solid #334155; padding-bottom:16px;">
+        <div style="background:rgba(59,130,246,0.2); border:1px solid #3b82f6; width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:22px;">📊</div>
+        <div>
+          <h2 style="margin:0; font-size:20px; font-weight:700; color:#f8fafc;">Web Traffic Quality &amp; SEO Diagnosis System</h2>
+          <p style="margin:4px 0 0; font-size:13px; color:#94a3b8;">結合 GA4、GSC 數據與 Rule-based 診斷邏輯的 Marketing Analytics 報表系統</p>
+        </div>
+      </div>
+
+      <!-- Content Sections -->
+      <div style="display:flex; flex-direction:column; gap:20px; font-size:14px; line-height:1.6; color:#cbd5e1;">
+        
+        <!-- 📌 作品集定位 -->
+        <div style="background:rgba(30,41,59,0.7); border:1px solid #334155; border-radius:12px; padding:16px;">
+          <h3 style="margin:0 0 8px; font-size:15px; color:#60a5fa; display:flex; align-items:center; gap:8px;">📌 作品集專案背景 (Portfolio Context)</h3>
+          <p style="margin:0 0 10px; font-size:13px;">本專案為個人公開作品集版本，重現實際工作中開發與維持的 Marketing Analytics 系統。為保護商業隱私，採去識別化假數據 (De-identified / Mock Data)，完整保留系統架構、正規化邏輯與分析視覺化。</p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; font-size:12px;">
+            <span style="background:rgba(59,130,246,0.15); color:#93c5fd; border:1px solid rgba(59,130,246,0.3); padding:4px 10px; border-radius:999px;">Marketing Analytics</span>
+            <span style="background:rgba(16,185,129,0.15); color:#6ee7b7; border:1px solid rgba(16,185,129,0.3); padding:4px 10px; border-radius:999px;">SEO Diagnosis Engine</span>
+            <span style="background:rgba(245,158,11,0.15); color:#fde047; border:1px solid rgba(245,158,11,0.3); padding:4px 10px; border-radius:999px;">URL Normalization</span>
+            <span style="background:rgba(139,92,246,0.15); color:#c4b5fd; border:1px solid rgba(139,92,246,0.3); padding:4px 10px; border-radius:999px;">FastAPI &amp; ECharts</span>
+          </div>
+        </div>
+
+        <!-- 💡 解決問題與核心痛點 -->
+        <div>
+          <h3 style="margin:0 0 10px; font-size:15px; color:#f8fafc; display:flex; align-items:center; gap:8px;">💡 核心解決痛點 (Key Analytical Pain Points)</h3>
+          <ul style="margin:0; padding-left:20px; display:flex; flex-direction:column; gap:8px; font-size:13px;">
+            <li><strong style="color:#f3f4f6;">跨平臺數據割裂 (Cross-Platform Isolation)</strong>：整合 GA4 (造訪後互動：Views, Engagement, Duration) 與 GSC (搜尋前段：Impressions, Clicks, Position, Queries) 於單一視角。</li>
+            <li><strong style="color:#f3f4f6;">網址正規化清洗 (URL Normalization)</strong>：自動剝離廣告追蹤碼 (<code style="background:rgba(0,0,0,0.3); padding:2px 5px; border-radius:4px; color:#93c5fd;">utm_*</code>, <code style="background:rgba(0,0,0,0.3); padding:2px 5px; border-radius:4px; color:#93c5fd;">gclid</code>, <code style="background:rgba(0,0,0,0.3); padding:2px 5px; border-radius:4px; color:#93c5fd;">fbclid</code>) 並精確比對 GSC Canonical URL，解決跨平臺 Join 痛點。</li>
+            <li><strong style="color:#f3f4f6;">Rule-based SEO 異常診斷</strong>：根據 YoY 點擊流失、排名下滑與 CTR 衰退計算 0~100 分 Anomaly Score，並自動標註診斷病徵標籤（如「高價值流量流失」、「排名衰退」、「高曝光低 CTR」）。</li>
+            <li><strong style="color:#f3f4f6;">Snapshot 快照策略</strong>：背景任務預計算快照，消除即時發起 API 的數十秒延遲與 Quota 限制，達成秒級回應。</li>
+          </ul>
+        </div>
+
+        <!-- ⚙️ 系統切換說明 -->
+        <div style="background:rgba(15,23,42,0.6); border:1px dashed #334155; border-radius:12px; padding:14px; font-size:13px;">
+          <h4 style="margin:0 0 6px; font-size:14px; color:#f8fafc;">🎛️ 雙模式互動說明</h4>
+          <p style="margin:0 0 6px;"><strong style="color:#60a5fa;">📊 GA4 流量品質模式</strong>：展示整體流量來源、參與率、平均停留時間與產品小分類流量表現。</p>
+          <p style="margin:0;"><strong style="color:#38bdf8;">🔍 GSC 自然流量診斷模式</strong>：提供 Glassmorphism 暗色視覺，展示搜尋象限圖、關鍵字點擊/排名變動與頁面級 SEO 診斷明細。</p>
+        </div>
+
+      </div>
+
+      <!-- Footer Button -->
+      <div style="margin-top:24px; text-align:right; border-top:1px solid #334155; padding-top:16px;">
+        <button onclick="document.getElementById('about-modal').style.display='none'" style="background:#3b82f6; color:#fff; border:none; padding:8px 20px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='#2563eb';" onmouseout="this.style.background='#3b82f6';">了解完成 (Close)</button>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="wrap">
+    <header style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <h1>網頁流量品質報表 <span style="font-size:11px;color:#888">API 版</span></h1>
+        <div class="sub">page_map：A=id，B=name(頁面標題)，C=product，D=product_detail，E=category</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <button onclick="document.getElementById('about-modal').style.display='flex'" style="background: rgba(59,130,246,0.15); border: 1px solid #3b82f6; color: #60a5fa; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+          ℹ️ 關於作品集 (Project Overview)
+        </button>
+        <div id="user-info-badge" style="display: none; align-items: center; gap: 10px; background: rgba(30,41,59,0.6); padding: 8px 16px; border-radius: 8px; border: 1px solid #334155;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span id="current-user-id" style="color: #cbd5e1; font-weight: 500; font-size: 14px;"></span>
+          </div>
+          <button onclick="logout()" style="background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: all 0.2s;" onmouseover="this.style.background='#ef4444'; this.style.color='#fff';" onmouseout="this.style.background='transparent'; this.style.color='#ef4444';">登出</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 顯示模式切換（分開 GA4 與 GSC） -->
+    <div class="mode-switch-container">
+      <button type="button" class="mode-switch-btn active" data-mode="ga4">📊 GA4 流量品質模式</button>
+      <button type="button" class="mode-switch-btn" data-mode="gsc">🔍 GSC 自然流量診斷模式</button>
+    </div>
+
+    <!-- 控制列：產品、來源群組、期間 + 比較期間 -->
+    <section class="card ctrls" style="margin-bottom:12px;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <label>產品：
+          <select id="sel-product">
+            <option value="">全部產品</option>
+          </select>
+        </label>
+        <label>小分類：
+          <select id="sel-prod-detail" disabled>
+            <option value="">全部分類</option>
+          </select>
+        </label>
+        <label class="ga4-only">來源（群組）：
+          <select id="sel-group">
+            <option value="">全部群組</option>
+          </select>
+        </label>
+        <label>期間：
+          <select id="sel-range">
+            <option value="7d">近 7 天</option>
+            <option value="14d">近 14 天</option>
+            <option value="28d">近 28 天</option>
+            <option value="90d">近 90 天</option>
+            <option value="last_month">上個月</option>
+            <option value="month" selected>當月</option>
+          </select>
+        </label>
+        <label>比較期間：
+          <select id="sel-compare">
+            <option value="none" selected>不比較</option>
+            <option value="yoy">去年同期</option>
+            <option value="prev">上一區間</option>
+          </select>
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button id="btn-export" class="ghostbtn btn-export"> Excel 匯出</button>
+        <div id="msg" class="muted">狀態：待載入</div>
+      </div>
+    </section>
+
+    <!-- KPI（主值 + 對照值 + Δ%） -->
+    <section class="grid kpi ga4-only">
+      <div class="card kpi-card">
+        <h3>使用者數（Users）</h3>
+        <div class="kpi-value kpi-users">—</div>
+        <div class="kpi-mini">對照：<span class="kpi-users-base">—</span> <span class="kpi-users-delta">—</span></div>
+      </div>
+      <div class="card kpi-card">
+        <h3>品質分數</h3>
+        <div class="kpi-value kpi-score">—</div>
+        <div class="kpi-mini">對照：<span class="kpi-score-base">—</span> <span class="kpi-score-delta">—</span></div>
+      </div>
+      <div class="card kpi-card">
+        <h3>平均停留（秒）</h3>
+        <div class="kpi-value kpi-dur">—</div>
+        <div class="kpi-mini">對照：<span class="kpi-dur-base">—</span> <span class="kpi-dur-delta">—</span></div>
+      </div>
+      <div class="card kpi-card">
+        <h3>參與率</h3>
+        <div class="kpi-value kpi-er">—</div>
+        <div class="kpi-mini">對照：<span class="kpi-er-base">—</span> <span class="kpi-er-delta">—</span></div>
+      </div>
+    </section>
+
+    <!-- GSC 自然流量指標 KPI -->
+    <section class="grid kpi gsc-only" style="grid-template-columns: repeat(4, 1fr); margin-top: 12px;">
+      <div class="card kpi-card gsc-kpi-card">
+        <h3>自然點擊數 (GSC Clicks)</h3>
+        <div class="kpi-value kpi-gsc-clicks">—</div>
+        <div class="kpi-mini">對照：<span class="kpi-gsc-clicks-base">—</span> <span class="kpi-gsc-clicks-delta">—</span>
+        </div>
+      </div>
+      <div class="card kpi-card gsc-kpi-card">
+        <h3>搜尋曝光數 (GSC Impressions)</h3>
+        <div class="kpi-value kpi-gsc-impr">—</div>
+        <div class="kpi-mini">對照：<span class="kpi-gsc-impr-base">—</span> <span class="kpi-gsc-impr-delta">—</span>
+        </div>
+      </div>
+      <div class="card kpi-card gsc-kpi-card">
+        <h3>自然點閱率 (GSC CTR)</h3>
+        <div class="kpi-value kpi-gsc-ctr">—</div>
+        <div class="kpi-mini">對照：<span class="kpi-gsc-ctr-base">—</span> <span class="kpi-gsc-ctr-delta">—</span></div>
+      </div>
+      <div class="card kpi-card gsc-kpi-card">
+        <h3>平均搜尋排名 (GSC Position)</h3>
+        <div class="kpi-value kpi-gsc-pos">—</div>
+        <div class="kpi-mini">對照：<span class="kpi-gsc-pos-base">—</span> <span class="kpi-gsc-pos-delta">—</span></div>
+      </div>
+    </section>
+
+    <!-- 自動化行銷診斷清單 -->
+    <section class="card diag-box gsc-only" style="margin-top: 12px;">
+      <div class="ctrls" style="margin-bottom: 8px; flex-wrap: wrap; gap: 10px;">
+        <h3 style="margin:0; color:#3b82f6;">🚨 自動化 SEO & 流量異常行銷診斷清單</h3>
+        <div class="diag-filters" id="diag-filters"
+          style="display:flex; gap:10px; font-size:13px; align-items:center; color:#ccc;">
+          <span style="font-weight:bold; color:#fff;">分析範圍：</span>
+          <label><input type="checkbox" value="news" checked onchange="renderDiagnostics()"> 新品新聞</label>
+          <label><input type="checkbox" value="article" checked onchange="renderDiagnostics()"> 保養文章</label>
+          <label><input type="checkbox" value="comment" checked onchange="renderDiagnostics()"> 評測心得</label>
+          <label><input type="checkbox" value="lecture" checked onchange="renderDiagnostics()"> 體驗直播</label>
+          <label><input type="checkbox" value="edm" checked onchange="renderDiagnostics()"> 會員EDM</label>
+          <label><input type="checkbox" value="course" checked onchange="renderDiagnostics()"> 產品專題</label>
+        </div>
+
+      </div>
+      <div id="diag-summary-cards"
+        style="display:none; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px;">
+      </div>
+      <div id="diag-echarts-container"
+        style="display:none; width: 100%; height: 400px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table class="diag-table">
+          <thead>
+            <tr>
+              <th style="width: 120px;">警報級別</th>
+              <th style="width: 300px;">異常頁面</th>
+              <th style="width: 200px;">異常型態</th>
+              <th style="width: 250px;">病徵數據</th>
+              <th>執行動作建議</th>
+            </tr>
+          </thead>
+          <tbody id="diag-tbody">
+            <tr>
+              <td colspan="5" class="muted">無診斷異常資料，請先選取「產品」載入數據</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 中段：來源彙總表 + 圓餅圖 -->
+    <section class="grid mid ga4-only" style="margin-top:12px;">
+      <div class="card">
+        <h3>來源彙總表</h3>
+        <table class="heatmap">
+          <thead>
+            <tr>
+              <th style="width:140px">來源群組</th>
+              <th style="width:160px">來源</th>
+              <th style="width:140px">Users</th>
+              <th style="width:140px">參與率</th>
+              <th style="width:110px">Avg Sec</th>
+              <th style="width:110px">Avg Sessions</th>
+            </tr>
+          </thead>
+          <tbody id="heat-tbody"></tbody>
+        </table>
+        <div class="muted" style="margin-top:6px;">
+          說明：未選群組時以「來源」層級彙總；選取群組後展開「來源（細分）」層級。<br>
+          比較期間（去年同期 / 上一區間）會在各欄位以徽章顯示相對變動。
+        </div>
+      </div>
+
+      <div class="card" id="pie-card">
+        <div class="ctrls" style="margin-bottom:6px;">
+          <h3 style="margin:0">整體流量來源圓餅圖（依 Users，占比）</h3>
+          <div class="chips">
+            <span class="chip active" data-pie-dim="group">來源</span>
+            <span class="chip" data-pie-dim="product">產品</span>
+            <button id="btn-pie-toggle" class="ghostbtn" title="切換 圖表/表格">表格</button>
+          </div>
+        </div>
+
+        <div class="pie-wrap">
+          <svg id="pie-svg" viewBox="0 0 360 360" width="100%" height="320"
+            style="border:1px solid var(--line);background:#fff;border-radius:8px;"></svg>
+          <div id="pie-table" style="display:none"></div>
+        </div>
+
+        <div id="pie-legend" class="legend"></div>
+      </div>
+    </section>
+
+    <!-- 下方三類頁面（Views/ER/Avg Sec 都顯示比較徽章；含總計列置頂） -->
+    <section class="card" style="margin-top:12px;">
+      <!-- ===== 下方頁籤（6 類） ===== -->
+      <div class="tabs" id="tabs">
+        <div class="tab active ga4-only" data-tab="total">全站總計</div>
+        <div class="tab" data-tab="news">新品新聞 (news_id)</div>
+        <div class="tab" data-tab="article">保養文章 (article_id)</div>
+        <div class="tab" data-tab="comment">評測心得 (comment_id)</div>
+        <div class="tab" data-tab="lecture">體驗直播 (lecture_id)</div>
+        <div class="tab" data-tab="edm">會員EDM (edm)</div>
+        <div class="tab" data-tab="course">產品專題 (subject)</div>
+        <div class="tab gsc-only" data-tab="gsc_queries">🔍 GSC 熱門搜尋字</div>
+      </div>
+      <div class="ctrls" style="justify-content:flex-end; margin:6px 0 8px;">
+        <label>GA4 排序：
+          <select id="sel-sort-ga4">
+            <option value="views_desc" selected>預設：使用人數(高→低)</option>
+            <option value="drop_abs">使用人數↓最多（人次）</option>
+            <option value="rise_abs">使用人數↑最多（人次）</option>
+            <option value="drop_pct">使用人數↓最多（%）</option>
+            <option value="rise_pct">使用人數↑最多（%）</option>
+          </select>
+        </label>
+        <label style="margin-left: 15px;">GSC 排序：
+          <select id="sel-sort-gsc">
+            <option value="" selected>-- 請選擇 --</option>
+            <option value="gsc_impr_desc">GSC 曝光 (高→低)</option>
+            <option value="gsc_clicks_desc">GSC 點擊 (高→低)</option>
+            <option value="gsc_ctr_desc">GSC CTR (高→低)</option>
+            <option value="gsc_pos_asc">GSC 排名 (高→低)</option>
+          </select>
+        </label>
+      </div>
+      <div id="tab-panels">
+        <div data-panel="total" class="ga4-only"></div>
+        <div data-panel="news" style="display:none"></div>
+        <div data-panel="article" style="display:none"></div>
+        <div data-panel="comment" style="display:none"></div>
+        <div data-panel="lecture" style="display:none"></div>
+        <div data-panel="edm" style="display:none"></div>
+        <div data-panel="course" style="display:none"></div>
+        <div data-panel="gsc_queries" style="display:none" class="gsc-only"></div>
+      </div>
+    </section>
+
+    <footer class="muted" style="margin-top:12px;">若空白請檢查：部署權限、GA4 進階服務、page_map 欄位名是否正確。</footer>
+  </div>
+
+  
+
+  <script>
+    /* --------------------- 小工具與前端快取 --------------------- */
+    const $ = (s, r = document) => r.querySelector(s);
+    const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+    let PIE_DIM = 'group'; // 'group' 或 'product'
+    let PIE_VIEW = 'chart'; // 'chart' 或 'table'
+    let SORT_MODE = 'views_desc'; // 'views_desc' | 'drop_abs' | 'rise_abs' | 'drop_pct' | 'rise_pct'
+
+    /* 轉義（避免 XSS） */
+    function esc(s) { return ('' + s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])) }
+
+    /* 可切換的除錯旗標（預設 false，確保後端快取可用） */
+    const DEBUG_MODE = false;
+    let PIE_MODE = 'source'; // 'source'｜'product'
+    function getSelectedDetail() {
+      const el = document.getElementById('sel-prod-detail');
+      return el ? (el.value || '') : '';
+    }
+
+    // 最新一份 filters（含 productDetailsByProduct），用來重建小分類下拉選單
+    let LATEST_FILTERS = null;
+    /* 前端工作階段快取：同一組合（k, product, group）直接使用記憶體資料 */
+    const FRONT_CACHE = {
+      all: new Map(),        // key: {"k","product","group"}
+      drill: new Map(),      // key: {"k","product","group"}
+      breakdowns: new Map()  // key: {"k","id","category","product","product_detail"}
+    };
+    function makeKey(obj) {
+      return JSON.stringify({
+        k: obj.k || '28d',
+        product: obj.product || '',
+        product_detail: obj.product_detail || '',
+        group: (obj.group || '').replace(/^未分類$/, '')
+      });
+    }
+
+    function setDisplayMode(mode) {
+      const m = mode || 'ga4';
+      document.body.className = 'mode-' + m;
+      document.querySelectorAll('.mode-switch-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === m);
+      });
+      if (m === 'gsc') {
+        setTimeout(() => {
+          if (window.diagChart) window.diagChart.resize();
+        }, 50);
+      }
+    }
+
+    function switchTab(tabKey) {
+      if (!tabKey) return;
+      document.querySelectorAll('#tabs .tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tabKey);
+      });
+      document.querySelectorAll('#tab-panels > [data-panel]').forEach(p => {
+        p.style.display = (p.dataset.panel === tabKey) ? 'block' : 'none';
+      });
+    }
+
+    function getComparePack(all, _) {
+      const mode = (document.getElementById('sel-compare') ? document.getElementById('sel-compare').value : 'none');
+      if (all && all.__kpiBaseOverride) {
+        return { kpiBase: all.__kpiBaseOverride };
+      }
+      if (!all || mode === 'none') {
+        return { kpiBase: null };
+      }
+      const base = (mode === 'prev') ? (all.kpi_prev || null) : (mode === 'yoy' ? (all.kpi_yoy || null) : null);
+      return { kpiBase: base };
+    }
+
+    function updateDebugPane(info) {
+      if (!info) return;
+      const whenEl = document.getElementById('dbg-when');
+      const urlEl = document.getElementById('dbg-url');
+      const statusEl = document.getElementById('dbg-status');
+      const ctEl = document.getElementById('dbg-ct');
+      const msEl = document.getElementById('dbg-ms');
+      const errEl = document.getElementById('dbg-err');
+      const snippetEl = document.getElementById('dbg-snippet');
+
+      if (whenEl) whenEl.textContent = new Date().toLocaleTimeString();
+      if (urlEl) urlEl.textContent = info.url || '-';
+      if (statusEl) statusEl.textContent = info.status != null ? info.status : '-';
+      if (ctEl) ctEl.textContent = info.ct || '-';
+      if (msEl) msEl.textContent = info.ms != null ? info.ms : '-';
+      if (errEl) errEl.textContent = info.err || '';
+      if (snippetEl) snippetEl.textContent = info.snippet || '-';
+    }
+
+    function rebuildProductDetailSelect(filters, product, keepDetail) {
+      const sel = $('#sel-prod-detail');
+      const map = (filters && filters.productDetailsByProduct) ? filters.productDetailsByProduct : {};
+      const list = product ? (map[product] || []) : [];
+
+      if (!product || !list.length) {
+        sel.innerHTML = '<option value="">（先選產品）</option>';
+        sel.disabled = true;
+        sel.value = '';
+        return;
+      }
+
+      const prev = keepDetail || '';
+      sel.innerHTML = ['<option value="">全部小分類</option>']
+        .concat(list.map(x => `<option value="${esc(x)}">${esc(x)}</option>`))
+        .join('');
+      sel.disabled = false;
+      if (list.includes(prev)) sel.value = prev; else sel.value = '';
+    }
+
+
+    /* 後端 API URL（支援本機 127.0.0.1 與 GitHub Pages 防呆退回） */
+    function apiUrl(params) {
+      let base = 'http://127.0.0.1:8888';
+      if (location.origin && location.origin !== 'null' && !location.origin.includes('file:') && !location.hostname.includes('github.io')) {
+        base = location.origin + location.pathname;
+      }
+      const u = new URL(base.endsWith('/') ? base : base + '/');
+      u.pathname = '/exec';
+      Object.keys(params || {}).forEach(k => {
+        const v = params[k];
+        if (v !== undefined && v !== null && v !== '') u.searchParams.set(k, v);
+      });
+      if (DEBUG_MODE) u.searchParams.set('debug', '1');
+      return u.toString();
+    }
+
+        function generateClientMockResponse(params) {
+      const type = (params && params.type) || 'all';
+      const prod = (params && params.product) || '';
+      const detail = (params && (params.product_detail || params.productDetail)) || '';
+      const group = (params && params.source_group) || '';
+
+      const products = ["美妝保養品", "保健食品", "個人清潔與護理", "居家清潔用品", "食品與飲料", "寵物用品與食品"];
+      const sourceGroups = ["Google 搜尋", "Meta 廣告", "IG 網紅引流", "LINE 官方帳號", "直接流量", "EDM 電子報"];
+      const productDetailsByProduct = {
+        "美妝保養品": ["保濕精華液", "抗老修護霜", "防曬乳液"],
+        "保健食品": ["專利益生菌", "綜合維他命", "高純度膠原蛋白飲"],
+        "個人清潔與護理": ["控油洗髮精", "親膚濕紙巾"],
+        "居家清潔用品": ["濃縮洗衣精", "除霉清潔劑", "植萃洗碗精"],
+        "食品與飲料": ["有機燕麥奶", "無糖氣泡水", "冷萃黑咖啡"],
+        "寵物用品與食品": ["無穀貓糧", "低粉塵豆腐貓砂", "高肉糧狗糧"]
+      };
+
+      if (type === 'all' || type === 'kpi') {
+        const rawHeatmap = [];
+        const sourceMapping = [
+          ["Google 搜尋", "google / organic"],
+          ["Meta 廣告", "facebook / cpc"],
+          ["IG 網紅引流", "instagram / referral"],
+          ["LINE 官方帳號", "line / oa"],
+          ["直接流量", "(direct) / (none)"],
+          ["EDM 電子報", "edm / newsletter"]
+        ];
+
+        let baseU = 14500;
+        products.forEach(p => {
+          const details = productDetailsByProduct[p] || ["通用款"];
+          details.forEach(d => {
+            sourceMapping.forEach(([sg, s]) => {
+              const u = baseU + (p.length * 420) + (d.length * 190) + (sg.length * 110);
+              const sess = Math.round(u * 1.22);
+              const er = Number((0.58 + (d.length % 5) * 0.035).toFixed(3));
+              const dur = 115 + (p.length % 4) * 18;
+              const isOrganic = (sg === 'Google 搜尋');
+              const clicks = isOrganic ? Math.round(u * 0.85) : 0;
+              const impr = isOrganic ? Math.round(clicks * 11.2) : 0;
+              const ctr = isOrganic ? Number((clicks / impr).toFixed(4)) : 0;
+              const pos = isOrganic ? Number((1.4 + (d.length % 4) * 0.7).toFixed(1)) : 0;
+
+              rawHeatmap.push({
+                product: p,
+                product_detail: d,
+                source_group: sg,
+                source: s,
+                users: u,
+                sessions: sess,
+                engagementRate: er,
+                avgDuration: dur,
+                gscClicks: clicks,
+                gscImpressions: impr,
+                gscCtr: ctr,
+                gscPosition: pos
+              });
+              baseU = (baseU + 890) % 22000 + 7500;
+            });
+          });
+        });
+
+        let heatmap = rawHeatmap.filter(x =>
+          (!prod || x.product === prod) &&
+          (!detail || x.product_detail === detail) &&
+          (!group || x.source_group === group)
+        );
+        if (!heatmap.length) heatmap = rawHeatmap;
+
+        const buildAgg = (hm) => {
+          const map = {};
+          hm.forEach(x => {
+            const k = x.source_group;
+            if (!map[k]) map[k] = { source_group: k, users: 0, sessions: 0, erW: 0, durW: 0, gscClicks: 0, gscImpressions: 0, gscPosW: 0 };
+            map[k].users += x.users;
+            map[k].sessions += x.sessions;
+            map[k].erW += x.sessions * x.engagementRate;
+            map[k].durW += x.sessions * x.avgDuration;
+            map[k].gscClicks += x.gscClicks || 0;
+            map[k].gscImpressions += x.gscImpressions || 0;
+            map[k].gscPosW += (x.gscPosition || 0) * (x.gscClicks || 0);
+          });
+          return Object.values(map).map(v => ({
+            source_group: v.source_group,
+            users: v.users,
+            sessions: v.sessions,
+            engagementRate: v.sessions ? v.erW / v.sessions : 0,
+            avgDuration: v.sessions ? v.durW / v.sessions : 0,
+            gscClicks: v.gscClicks,
+            gscImpressions: v.gscImpressions,
+            gscCtr: v.gscImpressions ? v.gscClicks / v.gscImpressions : 0,
+            gscPosition: v.gscClicks ? v.gscPosW / v.gscClicks : 0
+          }));
+        };
+
+        const buildProdAgg = (hm) => {
+          const map = {};
+          hm.forEach(x => {
+            const k = x.product;
+            if (!map[k]) map[k] = { product: k, users: 0, sessions: 0, erW: 0, durW: 0, gscClicks: 0, gscImpressions: 0, gscPosW: 0 };
+            map[k].users += x.users;
+            map[k].sessions += x.sessions;
+            map[k].erW += x.sessions * x.engagementRate;
+            map[k].durW += x.sessions * x.avgDuration;
+            map[k].gscClicks += x.gscClicks || 0;
+            map[k].gscImpressions += x.gscImpressions || 0;
+            map[k].gscPosW += (x.gscPosition || 0) * (x.gscClicks || 0);
+          });
+          return Object.values(map).map(v => ({
+            product: v.product,
+            users: v.users,
+            sessions: v.sessions,
+            engagementRate: v.sessions ? v.erW / v.sessions : 0,
+            avgDuration: v.sessions ? v.durW / v.sessions : 0,
+            gscClicks: v.gscClicks,
+            gscImpressions: v.gscImpressions,
+            gscCtr: v.gscImpressions ? v.gscClicks / v.gscImpressions : 0,
+            gscPosition: v.gscClicks ? v.gscPosW / v.gscClicks : 0
+          }));
+        };
+
+        const totalUsers = heatmap.reduce((sum, x) => sum + x.users, 0);
+        const totalSessions = heatmap.reduce((sum, x) => sum + x.sessions, 0);
+        const totalClicks = heatmap.reduce((sum, x) => sum + x.gscClicks, 0);
+        const totalImpr = heatmap.reduce((sum, x) => sum + x.gscImpressions, 0);
+
+        return {
+          ok: true,
+          kpi: {
+            users: totalUsers || 306253,
+            sessions: totalSessions || 385412,
+            pageViews: Math.round((totalSessions || 385412) * 1.4),
+            engagementRate: 0.685,
+            avgSessionSec: 148,
+            gscClicks: totalClicks || 51165,
+            gscImpressions: totalImpr || 583000,
+            gscCtr: totalImpr ? Number((totalClicks / totalImpr).toFixed(4)) : 0.0878,
+            gscPosition: 2.1
+          },
+          kpi_prev: {
+            users: Math.round((totalUsers || 306253) * 0.91),
+            sessions: Math.round((totalSessions || 385412) * 0.91),
+            pageViews: Math.round((totalSessions || 385412) * 1.25),
+            engagementRate: 0.650,
+            avgSessionSec: 140,
+            gscClicks: Math.round((totalClicks || 51165) * 0.90),
+            gscImpressions: Math.round((totalImpr || 583000) * 0.92),
+            gscCtr: 0.0851,
+            gscPosition: 2.4
+          },
+          kpi_yoy: {
+            users: Math.round((totalUsers || 306253) * 0.83),
+            sessions: Math.round((totalSessions || 385412) * 0.83),
+            pageViews: Math.round((totalSessions || 385412) * 1.15),
+            engagementRate: 0.620,
+            avgSessionSec: 132,
+            gscClicks: Math.round((totalClicks || 51165) * 0.82),
+            gscImpressions: Math.round((totalImpr || 583000) * 0.85),
+            gscCtr: 0.0820,
+            gscPosition: 2.8
+          },
+          filters: {
+            products: products,
+            sourceGroups: sourceGroups,
+            productDetailsByProduct: productDetailsByProduct
+          },
+          heatmap: heatmap,
+          heatAgg: buildAgg(heatmap),
+          heatAggByProduct: buildProdAgg(heatmap),
+          heatmap_prev: heatmap.map(x => ({ ...x, users: Math.round(x.users * 0.91), sessions: Math.round(x.sessions * 0.91), gscClicks: Math.round(x.gscClicks * 0.9) })),
+          heatAgg_prev: buildAgg(heatmap).map(x => ({ ...x, users: Math.round(x.users * 0.91) })),
+          heatAggByProduct_prev: buildProdAgg(heatmap).map(x => ({ ...x, users: Math.round(x.users * 0.91) })),
+          heatmap_yoy: heatmap.map(x => ({ ...x, users: Math.round(x.users * 0.83), sessions: Math.round(x.sessions * 0.83), gscClicks: Math.round(x.gscClicks * 0.82) })),
+          heatAgg_yoy: buildAgg(heatmap).map(x => ({ ...x, users: Math.round(x.users * 0.83) })),
+          heatAggByProduct_yoy: buildProdAgg(heatmap).map(x => ({ ...x, users: Math.round(x.users * 0.83) }))
+        };
+      }
+
+      if (type === 'drill') {
+        const makeItems = (cat, itemsList) => itemsList.map(item => ({
+          id: String(item.id),
+          pageId: String(item.id),
+          display_title: item.title,
+          title: item.title,
+          name: item.title,
+          category: cat,
+          product: item.prd,
+          product_detail: item.prdDetail,
+          views: item.views,
+          users: item.views,
+          engagementRate: item.er,
+          avgSec: item.dur,
+          avgDuration: item.dur,
+          gscClicks: item.clicks,
+          gscImpressions: item.impr,
+          gscCtr: Number((item.clicks / item.impr).toFixed(4)),
+          gscPosition: item.pos,
+          page_url: `https://demo.example.com/page?${cat}=${item.id}`,
+          gscPageUrl: `https://demo.example.com/page?${cat}=${item.id}`
+        }));
+
+        const pageMetrics = {
+          news_id: makeItems('news_id', [
+            { id: 1001, title: '2026 新品上市：控油洗髮精強效持香與蓬鬆控油成分公開', prd: '個人清潔與護理', prdDetail: '控油洗髮精', views: 14500, er: 0.75, dur: 168, clicks: 2850, impr: 18500, pos: 1.8 },
+            { id: 1002, title: '最新發表：專利益生菌雙層包埋技術臨床數據發布', prd: '保健食品', prdDetail: '專利益生菌', views: 12800, er: 0.71, dur: 152, clicks: 2420, impr: 16200, pos: 2.1 },
+            { id: 1003, title: '2026 旗艦防曬：極致清爽防曬乳液抗光老化評測發表', prd: '美妝保養品', prdDetail: '防曬乳液', views: 11200, er: 0.68, dur: 140, clicks: 1950, impr: 14800, pos: 2.5 },
+            { id: 1004, title: '環保新標竿：植萃濃縮洗衣精通過無毒綠色標章認證', prd: '居家清潔用品', prdDetail: '濃縮洗衣精', views: 9800, er: 0.66, dur: 135, clicks: 1620, impr: 12500, pos: 2.8 },
+            { id: 1005, title: '冷萃黑咖啡限定版新品上市：極致香醇微酸風味', prd: '食品與飲料', prdDetail: '冷萃黑咖啡', views: 8900, er: 0.69, dur: 145, clicks: 1480, impr: 11200, pos: 3.1 },
+            { id: 1006, title: '無穀鮮肉貓糧全效營養配方升級發布', prd: '寵物用品與食品', prdDetail: '無穀貓糧', views: 9500, er: 0.72, dur: 158, clicks: 1590, impr: 12100, pos: 2.6 }
+          ]),
+          article_id: makeItems('article_id', [
+            { id: 2001, title: '115年保濕精華液挑選指南：乾敏肌保濕成分全解析', prd: '美妝保養品', prdDetail: '保濕精華液', views: 16800, er: 0.78, dur: 185, clicks: 3200, impr: 21500, pos: 1.5 },
+            { id: 2002, title: '抗老修護霜用法與夜間保養黃金時間大公開', prd: '美妝保養品', prdDetail: '抗老修護霜', views: 13500, er: 0.74, dur: 165, clicks: 2550, impr: 17800, pos: 1.9 },
+            { id: 2003, title: '外食族如何補充綜合維他命？專業營養師教你聰明挑選', prd: '保健食品', prdDetail: '綜合維他命', views: 11900, er: 0.70, dur: 148, clicks: 2100, impr: 15200, pos: 2.3 },
+            { id: 2004, title: '除霉清潔劑不傷衛浴表面使用訣竅與安全事項', prd: '居家清潔用品', prdDetail: '除霉清潔劑', views: 10400, er: 0.67, dur: 138, clicks: 1750, impr: 13200, pos: 2.7 },
+            { id: 2005, title: '有機燕麥奶無糖低卡飲用優點與特調拿鐵教學', prd: '食品與飲料', prdDetail: '有機燕麥奶', views: 9200, er: 0.68, dur: 142, clicks: 1520, impr: 11800, pos: 3.0 },
+            { id: 2006, title: '豆腐貓砂凝結力與除臭力比較：極致低粉塵選購心法', prd: '寵物用品與食品', prdDetail: '低粉塵豆腐貓砂', views: 10100, er: 0.73, dur: 162, clicks: 1680, impr: 12900, pos: 2.4 }
+          ]),
+          comment_id: makeItems('comment_id', [
+            { id: 3001, title: '植萃洗碗精實測心得：不傷手溫和去油污力極佳', prd: '居家清潔用品', prdDetail: '植萃洗碗精', views: 12900, er: 0.76, dur: 172, clicks: 2350, impr: 16500, pos: 1.7 },
+            { id: 3002, title: '控油洗髮精連續使用兩週油光與蓬鬆度對比心得', prd: '個人清潔與護理', prdDetail: '控油洗髮精', views: 14100, er: 0.77, dur: 178, clicks: 2680, impr: 18200, pos: 1.6 },
+            { id: 3003, title: '膠原蛋白飲飲用滿一個月氣色與彈潤感真實反饋', prd: '保健食品', prdDetail: '高純度膠原蛋白飲', views: 11500, er: 0.72, dur: 155, clicks: 2050, impr: 14900, pos: 2.2 },
+            { id: 3004, title: '無糖氣泡水佐餐搭配心得：清爽解膩零卡路里首選', prd: '食品與飲料', prdDetail: '無糖氣泡水', views: 8800, er: 0.65, dur: 130, clicks: 1390, impr: 10800, pos: 3.2 },
+            { id: 3005, title: '親膚濕紙巾嬰幼兒使用體驗：厚實純水無香精大推', prd: '個人清潔與護理', prdDetail: '親膚濕紙巾', views: 9600, er: 0.71, dur: 146, clicks: 1580, impr: 11900, pos: 2.9 }
+          ]),
+          lecture_id: makeItems('lecture_id', [
+            { id: 4001, title: '夏日防曬乳液補擦技巧與線上直播精華回顧', prd: '美妝保養品', prdDetail: '防曬乳液', views: 9800, er: 0.70, dur: 160, clicks: 1620, impr: 12400, pos: 2.4 },
+            { id: 4002, title: '腸道健康與專利益生菌觀念直播大公開', prd: '保健食品', prdDetail: '專利益生菌', views: 11200, er: 0.73, dur: 175, clicks: 1980, impr: 14500, pos: 2.0 },
+            { id: 4003, title: '居家環境消毒與濃縮洗衣精劑量拿捏專家線上對談', prd: '居家清潔用品', prdDetail: '濃縮洗衣精', views: 8500, er: 0.67, dur: 140, clicks: 1350, impr: 10500, pos: 3.1 }
+          ]),
+          edm: makeItems('edm', [
+            { id: 5001, title: '【會員尊榮】保濕精華液與抗老修護霜限時買一送一優惠函', prd: '美妝保養品', prdDetail: '保濕精華液', views: 18500, er: 0.69, dur: 150, clicks: 3100, impr: 22000, pos: 1.8 },
+            { id: 5002, title: '【健康快報】綜合維他命與益生菌週年慶滿額贈優惠快訊', prd: '保健食品', prdDetail: '綜合維他命', views: 15200, er: 0.66, dur: 142, clicks: 2450, impr: 17500, pos: 2.2 }
+          ]),
+          f_subject_no: makeItems('f_subject_no', [
+            { id: 6001, title: '2026 美妝保養品全面防護專題', prd: '美妝保養品', prdDetail: '保濕精華液', views: 12500, er: 0.74, dur: 168, clicks: 2150, impr: 15500, pos: 2.1 }
+          ]),
+          subject_no: makeItems('subject_no', [
+            { id: 7001, title: '純淨居家清潔用品無毒提案', prd: '居家清潔用品', prdDetail: '濃縮洗衣精', views: 10800, er: 0.71, dur: 154, clicks: 1780, impr: 13200, pos: 2.5 }
+          ])
+        };
+
+        const filterItems = (arr) => (arr || []).filter(x =>
+          (!prod || x.product === prod) &&
+          (!detail || x.product_detail === detail)
+        );
+
+        const filteredMetrics = {};
+        Object.keys(pageMetrics).forEach(k => {
+          const res = filterItems(pageMetrics[k]);
+          filteredMetrics[k] = res.length ? res : pageMetrics[k];
+        });
+
+        const pageMetrics_prev = JSON.parse(JSON.stringify(filteredMetrics));
+        Object.keys(pageMetrics_prev).forEach(k => {
+          pageMetrics_prev[k].forEach(x => {
+            x.views = Math.round(x.views * 0.91);
+            x.users = Math.round(x.users * 0.91);
+            x.gscClicks = Math.round(x.gscClicks * 0.90);
+          });
+        });
+
+        const pageMetrics_yoy = JSON.parse(JSON.stringify(filteredMetrics));
+        Object.keys(pageMetrics_yoy).forEach(k => {
+          pageMetrics_yoy[k].forEach(x => {
+            x.views = Math.round(x.views * 0.83);
+            x.users = Math.round(x.users * 0.83);
+            x.gscClicks = Math.round(x.gscClicks * 0.82);
+          });
+        });
+
+        const rawDiagnostics = [
+          { id: "1001", category: "news_id", name: "2026 新品上市：控油洗髮精強效持香與蓬鬆控油成分公開", product: "個人清潔與護理", product_detail: "控油洗髮精", score: 88, archetype: "高價值流量流失", gscPhenomenon: "關鍵字排名穩定（第 1.8 名），但點擊數同比下滑 -450 次", priorityAction: "建議重新檢查 SERP 標題吸引力，更新 2026 最新年份文案以提升點閱率", gscPageUrl: "https://demo.example.com/page?news_id=1001", deltaClicks: -450, deltaImpr: -1200, gscClicks: 2850, gscImpressions: 18500, gscCtr: 0.1541, gscPosition: 1.8 },
+          { id: "2001", category: "article_id", name: "115年保濕精華液挑選指南：乾敏肌保濕成分全解析", product: "美妝保養品", product_detail: "保濕精華液", score: 76, archetype: "CTR不足", gscPhenomenon: "搜尋曝光高達 32,000 次，但 CTR 僅 1.2% 遠低於同類別平均", priorityAction: "優化 Meta Description 與 H2 結構標題，加入產品主打成分優勢", gscPageUrl: "https://demo.example.com/page?article_id=2001", deltaClicks: -180, deltaImpr: 5400, gscClicks: 384, gscImpressions: 32000, gscCtr: 0.0120, gscPosition: 4.5 },
+          { id: "3001", category: "comment_id", name: "植萃洗碗精實測心得：不傷手溫和去油污力極佳", product: "居家清潔用品", product_detail: "植萃洗碗精", score: 95, archetype: "快進首頁", gscPhenomenon: "排名從第 12 名急速攀升至第 1.7 名，點擊數大幅成長 +820 次", priorityAction: "持續增加站內相關文章反向連結，鞏固前 3 名熱門排名", gscPageUrl: "https://demo.example.com/page?comment_id=3001", deltaClicks: 820, deltaImpr: 6800, gscClicks: 2350, gscImpressions: 16500, gscCtr: 0.1424, gscPosition: 1.7 },
+          { id: "4001", category: "lecture_id", name: "夏日防曬乳液補擦技巧與線上直播精華回顧", product: "美妝保養品", product_detail: "防曬乳液", score: 68, archetype: "高曝光低", gscPhenomenon: "搜尋曝光量達 18,500 次，但頁面參與率僅 35%", priorityAction: "於頁面上方增加影片重點章節標籤，減少使用者離退率", gscPageUrl: "https://demo.example.com/page?lecture_id=4001", deltaClicks: -90, deltaImpr: 2100, gscClicks: 520, gscImpressions: 18500, gscCtr: 0.0281, gscPosition: 6.8 },
+          { id: "1002", category: "news_id", name: "最新發表：專利益生菌雙層包埋技術臨床數據發布", product: "保健食品", product_detail: "專利益生菌", score: 82, archetype: "排名衰退", gscPhenomenon: "搜尋排名從 1.2 名下滑至 3.5 名，點擊數衰退 -320 次", priorityAction: "補充 2026 最新臨床研究引註，增強權威度反向連結", gscPageUrl: "https://demo.example.com/page?news_id=1002", deltaClicks: -320, deltaImpr: -850, gscClicks: 2420, gscImpressions: 16200, gscCtr: 0.1494, gscPosition: 3.5 },
+          { id: "2003", category: "article_id", name: "外食族如何補充綜合維他命？專業營養師教你聰明挑選", product: "保健食品", product_detail: "綜合維他命", score: 79, archetype: "高價值流量流失", gscPhenomenon: "搜尋點擊數較前一期下滑 -380 次，但搜尋需求仍高", priorityAction: "加入外食補充步驟懶人包圖表，增加段落標題點擊誘因", gscPageUrl: "https://demo.example.com/page?article_id=2003", deltaClicks: -380, deltaImpr: -1100, gscClicks: 2100, gscImpressions: 15200, gscCtr: 0.1381, gscPosition: 2.3 },
+          { id: "3003", category: "comment_id", name: "膠原蛋白飲飲用滿一個月氣色與彈潤感真實反饋", product: "保健食品", product_detail: "高純度膠原蛋白飲", score: 92, archetype: "快進首頁", gscPhenomenon: "排名進步至 2.2 名，搜尋點擊數成長 +540 次", priorityAction: "置頂高熱度討論回應，延伸延伸相關膠原蛋白保養文案", gscPageUrl: "https://demo.example.com/page?comment_id=3003", deltaClicks: 540, deltaImpr: 3800, gscClicks: 2050, gscImpressions: 14900, gscCtr: 0.1375, gscPosition: 2.2 },
+          { id: "4002", category: "lecture_id", name: "腸道健康與專利益生菌觀念直播大公開", product: "保健食品", product_detail: "專利益生菌", score: 71, archetype: "CTR不足", gscPhenomenon: "搜尋曝光 14,500 次，但點閱率 1.4% 偏低", priorityAction: "優化標題與直播精華小剪輯，增加點擊與停留時間", gscPageUrl: "https://demo.example.com/page?lecture_id=4002", deltaClicks: -110, deltaImpr: 2800, gscClicks: 1980, gscImpressions: 14500, gscCtr: 0.1365, gscPosition: 2.0 },
+          { id: "2002", category: "article_id", name: "抗老修護霜用法與夜間保養黃金時間大公開", product: "美妝保養品", product_detail: "抗老修護霜", score: 62, archetype: "搜尋需求下降", gscPhenomenon: "季節性搜尋熱度降低，曝光數減少 -3,400 次", priorityAction: "延伸淡季維護保養主題，調整搜尋關鍵字覆蓋廣度", gscPageUrl: "https://demo.example.com/page?article_id=2002", deltaClicks: -120, deltaImpr: -3400, gscClicks: 2550, gscImpressions: 17800, gscCtr: 0.1433, gscPosition: 1.9 },
+          { id: "3002", category: "comment_id", name: "控油洗髮精連續使用兩週油光與蓬鬆度對比心得", product: "個人清潔與護理", product_detail: "控油洗髮精", score: 91, archetype: "快進首頁", gscPhenomenon: "排名進入第 1.6 名，點擊數成長 +650 次", priorityAction: "維護內容新鮮度與使用者真實留言互動", gscPageUrl: "https://demo.example.com/page?comment_id=3002", deltaClicks: 650, deltaImpr: 4500, gscClicks: 2680, gscImpressions: 18200, gscCtr: 0.1473, gscPosition: 1.6 },
+          { id: "1005", category: "news_id", name: "冷萃黑咖啡限定版新品上市：極致香醇微酸風味", product: "食品與飲料", product_detail: "冷萃黑咖啡", score: 86, archetype: "高價值流量流失", gscPhenomenon: "熱門字點擊數微幅下滑 -210 次，搜尋熱度高", priorityAction: "增加產品風味口感與萃取工藝詳細說明", gscPageUrl: "https://demo.example.com/page?news_id=1005", deltaClicks: -210, deltaImpr: -900, gscClicks: 1480, gscImpressions: 11200, gscCtr: 0.1321, gscPosition: 3.1 },
+          { id: "2005", category: "article_id", name: "有機燕麥奶無糖低卡飲用優點與特調拿鐵教學", product: "食品與飲料", product_detail: "有機燕麥奶", score: 89, archetype: "快進首頁", gscPhenomenon: "排名迅速提升至 3.0 名，點擊數成長 +420 次", priorityAction: "嵌入拿鐵特調教學短影片，加強內容吸引力", gscPageUrl: "https://demo.example.com/page?article_id=2005", deltaClicks: 420, deltaImpr: 3200, gscClicks: 1520, gscImpressions: 11800, gscCtr: 0.1288, gscPosition: 3.0 },
+          { id: "1006", category: "news_id", name: "無穀鮮肉貓糧全效營養配方升級發布", product: "寵物用品與食品", product_detail: "無穀貓糧", score: 84, archetype: "排名衰退", gscPhenomenon: "排名從 1.8 名微降至 2.6 名，點擊數下滑 -190 次", priorityAction: "更新肉類成分比例標示，吸引飼主專業點擊", gscPageUrl: "https://demo.example.com/page?news_id=1006", deltaClicks: -190, deltaImpr: -650, gscClicks: 1590, gscImpressions: 12100, gscCtr: 0.1314, gscPosition: 2.6 },
+          { id: "2006", category: "article_id", name: "豆腐貓砂凝結力與除臭力比較：極致低粉塵選購心法", product: "寵物用品與食品", product_detail: "低粉塵豆腐貓砂", score: 90, archetype: "快進首頁", gscPhenomenon: "點擊數顯著成長 +510 次，排名躍升至 2.4 名", priorityAction: "新增貓砂實測吸水性表格，強化權威度", gscPageUrl: "https://demo.example.com/page?article_id=2006", deltaClicks: 510, deltaImpr: 3600, gscClicks: 1680, gscImpressions: 12900, gscCtr: 0.1302, gscPosition: 2.4 },
+          { id: "5001", category: "edm", name: "【會員尊榮】保濕精華液與抗老修護霜限時買一送一優惠函", product: "美妝保養品", product_detail: "保濕精華液", score: 85, archetype: "高價值流量流失", gscPhenomenon: "活動結束後搜尋點擊回落 -290 次", priorityAction: "更新活動頁面為常態導購與相關熱門保養導流", gscPageUrl: "https://demo.example.com/page?edm=5001", deltaClicks: -290, deltaImpr: -1100, gscClicks: 3100, gscImpressions: 22000, gscCtr: 0.1409, gscPosition: 1.8 }
+        ];
+
+        let diagnosticsTop5 = rawDiagnostics.filter(x =>
+          (!prod || x.product === prod) &&
+          (!detail || x.product_detail === detail)
+        );
+        if (!diagnosticsTop5.length) diagnosticsTop5 = rawDiagnostics;
+
+        return {
+          ok: true,
+          pageMetrics: filteredMetrics,
+          pageMetrics_prev,
+          pageMetrics_yoy,
+          diagnosticsTop5
+        };
+      }
+
+      if (type === 'gsc_top_queries') {
+        return {
+          ok: true,
+          queries: [
+            { query: "2026 FMCG 熱門商品 推薦", clicks: 3250, yoy_clicks: 2800, deltaClicks: 450, impressions: 21800, yoy_impr: 19200, deltaImpr: 2600, ctr: 0.1491, yoy_ctr: 0.1458, deltaCtr: 0.0033, position: 1.6, yoy_pos: 2.1, deltaPos: -0.5, judgement: "成長中字詞" },
+            { query: "控油洗髮精 評測 評價 推薦", clicks: 2840, yoy_clicks: 2200, deltaClicks: 640, impressions: 18200, yoy_impr: 14800, deltaImpr: 3400, ctr: 0.1560, yoy_ctr: 0.1486, deltaCtr: 0.0074, position: 1.8, yoy_pos: 3.2, deltaPos: -1.4, judgement: "潛力字" },
+            { query: "保濕精華液 挑選 指南", clicks: 2680, yoy_clicks: 2950, deltaClicks: -270, impressions: 22400, yoy_impr: 21000, deltaImpr: 1400, ctr: 0.1196, yoy_ctr: 0.1405, deltaCtr: -0.0209, position: 2.1, yoy_pos: 1.9, deltaPos: 0.2, judgement: "曝光增加但CTR差" },
+            { query: "抗老修護霜 專櫃 平替 推薦", clicks: 2250, yoy_clicks: 2400, deltaClicks: -150, impressions: 16800, yoy_impr: 17200, deltaImpr: -400, ctr: 0.1339, yoy_ctr: 0.1395, deltaCtr: -0.0056, position: 2.8, yoy_pos: 2.4, deltaPos: 0.4, judgement: "排名輕微下滑" },
+            { query: "有機燕麥奶 無糖 低卡 熱量", clicks: 1980, yoy_clicks: 1450, deltaClicks: 530, impressions: 15500, yoy_impr: 11200, deltaImpr: 4300, ctr: 0.1277, yoy_ctr: 0.1295, deltaCtr: -0.0018, position: 3.2, yoy_pos: 4.8, deltaPos: -1.6, judgement: "搜尋量快速成長" },
+            { query: "專利益生菌 雙層包埋 推薦", clicks: 1850, yoy_clicks: 1600, deltaClicks: 250, impressions: 13900, yoy_impr: 12100, deltaImpr: 1800, ctr: 0.1331, yoy_ctr: 0.1322, deltaCtr: 0.0009, position: 2.4, yoy_pos: 3.1, deltaPos: -0.7, judgement: "穩定成長" },
+            { query: "植萃洗碗精 不傷手 評價", clicks: 1720, yoy_clicks: 1210, deltaClicks: 510, impressions: 12800, yoy_impr: 9500, deltaImpr: 3300, ctr: 0.1344, yoy_ctr: 0.1274, deltaCtr: 0.0070, position: 2.2, yoy_pos: 3.6, deltaPos: -1.4, judgement: "潛力字" },
+            { query: "防曬乳液 清爽 不黏膩 評測", clicks: 1590, yoy_clicks: 1800, deltaClicks: -210, impressions: 14200, yoy_impr: 14500, deltaImpr: -300, ctr: 0.1120, yoy_ctr: 0.1241, deltaCtr: -0.0121, position: 3.5, yoy_pos: 3.1, deltaPos: 0.4, judgement: "季節性回落" }
+          ]
+        };
+      }
+
+      if (type === 'query_pages') {
+        return {
+          ok: true,
+          pages: [
+            { category: "news_id", id: "1001", title: "2026 新品上市：控油洗髮精強效持香與蓬鬆控油成分公開", impressions: 12500, clicks: 1850, ctr: 0.1480, position: 1.8 },
+            { category: "article_id", id: "2001", title: "115年保濕精華液挑選指南：乾敏肌保濕成分全解析", impressions: 9300, clicks: 1400, ctr: 0.1505, position: 2.1 }
+          ]
+        };
+      }
+
+      if (type === 'page_queries') {
+        return {
+          ok: true,
+          queries: [
+            { query: "2026 FMCG 熱門商品 推薦", clicks: 3250, yoy_clicks: 2800, deltaClicks: 450, impressions: 21800, yoy_impr: 19200, deltaImpr: 2600, ctr: 0.1491, yoy_ctr: 0.1458, deltaCtr: 0.0033, position: 1.6, yoy_pos: 2.1, deltaPos: -0.5, judgement: "成長中字詞" },
+            { query: "控油洗髮精 評測 評價 推薦", clicks: 2840, yoy_clicks: 2200, deltaClicks: 640, impressions: 18200, yoy_impr: 14800, deltaImpr: 3400, ctr: 0.1560, yoy_ctr: 0.1486, deltaCtr: 0.0074, position: 1.8, yoy_pos: 3.2, deltaPos: -1.4, judgement: "潛力字" }
+          ]
+        };
+      }
+
+      return { ok: true };
+    }
+
+    async function callAPI(params, opts) {
+      if (location.hostname.includes('github.io')) {
+        return generateClientMockResponse(params);
+      }
+      const timeoutMs = (opts && opts.timeoutMs) || 5000;
+      const maxRetries = (opts && opts.retries != null) ? opts.retries : 1;
+
+      let attempt = 0, lastErr;
+      while (attempt <= maxRetries) {
+        const t0 = performance.now();
+        const url = apiUrl(params) + "&emp_id=" + encodeURIComponent(CURRENT_EMP_ID);
+        let status, ct, text = '';
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), timeoutMs);
+
+        try {
+          const res = await fetch(url, { cache: 'no-store', signal: ctl.signal });
+          status = res.status;
+          ct = res.headers.get('content-type') || '';
+          text = await res.text();
+          const ms = Math.round(performance.now() - t0);
+          updateDebugPane({ url, status, ct, ms, snippet: (text || '').slice(0, 300).replace(/\u0000/g, '␀') });
+          if (status === 401) {
+            localStorage.removeItem("emp_id");
+            CURRENT_EMP_ID = "";
+            showLoginModal("您的員編驗證已失效或不合法，請重新登入");
+            throw new Error("Unauthorized");
+          }
+          if (!res.ok) throw new Error(`HTTP ${status}: ${text.slice(0, 200)}…`);
+          if (!ct.includes('application/json')) throw new Error(`非 JSON 回應（${ct}）`);
+
+          const json = JSON.parse(text);
+          return json;
+        } catch (e) {
+          lastErr = e;
+          const aborted = (e && (e.name === 'AbortError' || String(e).includes('aborted')));
+          const ms = Math.round(performance.now() - t0);
+          const errMsg = e?.message || String(e);
+          updateDebugPane({ url, status, ct, ms, snippet: (text || '').slice(0, 300), err: errMsg });
+
+          if (attempt < maxRetries) {
+            attempt++;
+            continue;
+          }
+          // 當伺服器未啟動或無法連線時（如 GitHub Pages 靜態預覽），自動啟用 Client-Side 純前端 Mock 備援數據
+          console.warn("[Standalone Preview Mode] 未連接本地伺服器，自動切換至純前端模擬引擎", params);
+          const clientMock = generateClientMockResponse(params);
+          return clientMock;
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+      return generateClientMockResponse(params);
+    }
+
+    /* --------------------- 比較用工具 --------------------- */
+    function pct(n, d = 1) {
+      if (!isFinite(n)) return '-';
+      const v = n * 100;
+      const s = v > 0 ? '+' : (v < 0 ? '-' : '');
+      return s + Math.abs(v).toFixed(d) + '%';
+    }
+    function cls(n) { return (n || 0) >= 0 ? 'pos' : 'neg'; }
+
+    /* --------------------- 頁面邏輯 --------------------- */
+
+    /* 初始化載入：暖機（warmup + 輕量 KPI）→ 取 all（不帶篩選）→ refreshAll */
+    async function initAndLoad() {
+      try {
+        $('#msg').textContent = '狀態：讀取中…';
+
+        /* 先暖機：避免第一次 runReport 過慢（不影響 UI，失敗忽略）*/
+        try { await callAPI({ type: 'kpi', k: '7d' }, { timeoutMs: 20000, retries: 0 }); } catch (_e) { }
+
+        const range = $('#sel-range').value || '28d';
+
+        /* 先抓一版不帶篩選，確保下拉一定有資料（命中後端 6h 快取）*/
+        const data = await callAPI({ type: 'all', k: range, limit: '10000' });
+        if (data && data.filters) {
+          const prods = Array.isArray(data.filters.products) ? data.filters.products : [];
+          $('#sel-product').innerHTML = ['<option value="">全部產品</option>'].concat(prods.map(p => `<option value="${esc(p)}">${esc(p)}</option>`)).join('');
+
+          LATEST_FILTERS = data.filters || null;
+          rebuildProductDetailSelect(LATEST_FILTERS, $('#sel-product').value || '', '');
+
+          const groups = Array.isArray(data.filters.sourceGroups) ? data.filters.sourceGroups : [];
+          $('#sel-group').innerHTML = '<option value="">全部群組</option>' + groups.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
+        }
+
+        /* 依 UI 當前選擇再抓一次（走前端快取邏輯）*/
+        await refreshAll();
+        bindTabs();
+
+        const activeTab = $('.tab.active');
+        if (activeTab) {
+          switchTab(activeTab.dataset.tab);
+        }
+      } catch (err) {
+        $('#msg').textContent = '狀態：失敗 - ' + (err && err.message ? err.message : err);
+      }
+    }
+
+    function rerenderFromCacheOnly() {
+      const product = $('#sel-product').value || '';
+      const detail = getSelectedDetail();
+      const groupUi = $('#sel-group').value || '';
+      const group = groupUi.replace(/^未分類$/, '');
+      const range = $('#sel-range').value || '28d';
+      const key = makeKey({ k: range, product, product_detail: detail, group });
+
+      const all = FRONT_CACHE.all.get(key);
+      const drill = FRONT_CACHE.drill.get(key);
+
+      if (all) {
+        renderKPI(all, drill);
+
+        let rowsCur = (all && all.heatmap && all.heatmap.length) ? all.heatmap : (all.heatAgg || []);
+        let rowsPrev = (all && all.heatmap_prev && all.heatmap_prev.length) ? all.heatmap_prev : (all.heatAgg_prev || []);
+        let rowsYoY = (all && all.heatmap_yoy && all.heatmap_yoy.length) ? all.heatmap_yoy : (all.heatAgg_yoy || []);
+
+        renderHeatSummary(rowsCur, rowsPrev, rowsYoY, $('#sel-group').value || '');
+        renderPieBlock(all);
+      }
+
+      if (drill) {
+        try {
+          renderTabs(
+            drill.pageMetrics || { news_id: [], article_id: [], comment_id: [], lecture_id: [], edm: [], f_subject_no: [], subject_no: [] },
+            drill.pageMetrics_prev || { news_id: [], article_id: [], comment_id: [], lecture_id: [], edm: [], f_subject_no: [], subject_no: [] },
+            drill.pageMetrics_yoy || { news_id: [], article_id: [], comment_id: [], lecture_id: [], edm: [], f_subject_no: [], subject_no: [] }
+          );
+        } catch (e) { console.error("renderTabs error:", e); }
+
+        try {
+          renderDiagnostics();
+        } catch (e) { console.error("renderDiagnostics error:", e); }
+      }
+    }
+
+    // 🔄 主刷新：依目前 UI 篩選條件打 API，更新 KPI / 來源 / 圓餅圖 / 頁面表
+    async function refreshAll() {
+      try {
+        // 目前 UI 上的篩選條件
+        const product = $('#sel-product').value || '';          // 產品
+        const detail = getSelectedDetail();                    // 小分類（可能為空字串）
+        const groupUi = $('#sel-group').value || '';            // 群組（下拉顯示文字，可能是「未分類」）
+        const group = groupUi.replace(/^未分類$/, '');         // 後端的「未分類」用空字串表示
+        const range = $('#sel-range').value || '28d';         // 期間（7d / 14d / 28d / 90d / month / last_month）
+
+        // 依 k + product + product_detail + group 組前端快取 key
+        const key = makeKey({ k: range, product, product_detail: detail, group });
+
+        // 若有前端快取，先用快取重畫畫面，提升「秒切」體感，再去打 API 更新
+        if (FRONT_CACHE.all.has(key) || FRONT_CACHE.drill.has(key)) {
+          rerenderFromCacheOnly();
+          $('#msg').textContent = '狀態：快取已套用，更新中…';
+        } else {
+          $('#msg').textContent = '狀態：讀取中…';
+          // 下方各頁籤先顯示「載入中…」避免空白
+          $$('[data-panel]').forEach(p => {
+            p.innerHTML = '<div class="muted">載入中…</div>';
+          });
+        }
+
+        // =========================
+        // 1) 先抓 type=all（KPI / 來源表 / 圓餅圖 / filters）
+        //    若有選小分類（product_detail），就加上 invalidate=1
+        //    讓後端略過 L2 / monthly 快照，直接算當次條件，避免因快照缺少小分類維度而出現「無資料」
+        // =========================
+        const paramsAll = {
+          type: 'all',
+          k: range,
+          product: product,
+          // ★ 雙軌保險：同時帶 productDetail（駝峰）與 product_detail（底線）
+          //   只要後端任一種命名有接，就能吃到小分類條件
+          productDetail: detail,
+          product_detail: detail,
+          source_group: group,
+          limit: '10000'
+        };
+
+        const all = await callAPI(paramsAll);
+
+        // 防禦：若後端標示失敗（ok=false 或完全沒有 ok）就丟錯
+        if (!all || !all.ok) {
+          throw new Error('API 回應異常: ' + (all && all.error ? all.error : '未知錯誤'));
+        }
+
+        // ---------- 產品下拉選單 ----------
+        if (all && all.filters && Array.isArray(all.filters.products)) {
+          const prods = all.filters.products;
+          $('#sel-product').innerHTML =
+            ['<option value="">全部產品</option>']
+              .concat(prods.map(p => `<option value="${esc(p)}">${esc(p)}</option>`))
+              .join('');
+          // 若目前選的 product 還在清單中，就維持選取；不在就清空
+          if (prods.includes(product)) {
+            $('#sel-product').value = product;
+          }
+        }
+
+        // 記住最新的 filters，之後重建小分類下拉要用
+        if (all.filters) {
+          LATEST_FILTERS = all.filters;
+        }
+        // 依目前選到的產品，重建「小分類」下拉；並試圖保留原本的小分類選取
+        rebuildProductDetailSelect(LATEST_FILTERS, $('#sel-product').value || '', detail);
+
+        // ---------- 群組下拉：用「不帶群組」的結果重建，避免被縮水 ----------
+        let allNoGroup = null;
+        if (group) {
+          // 群組下拉要用「未帶群組」的 filters，避免下拉選項被目前 group 縮水
+          const paramsNoGroup = {
+            type: 'all',
+            k: range,
+            product: product,
+            productDetail: detail,
+            product_detail: detail,
+            source_group: '',
+            limit: '10000'
+          };
+          allNoGroup = await callAPI(paramsNoGroup);
+        }
+
+        const groupsForSelect =
+          (allNoGroup && allNoGroup.filters && Array.isArray(allNoGroup.filters.sourceGroups) && allNoGroup.filters.sourceGroups.length)
+            ? allNoGroup.filters.sourceGroups
+            : ((all && all.filters && Array.isArray(all.filters.sourceGroups)) ? all.filters.sourceGroups : []);
+
+        if (groupsForSelect && groupsForSelect.length) {
+          const prevGroup = $('#sel-group').value || ''; // 記住原本使用者選的值
+          $('#sel-group').innerHTML =
+            '<option value="">全部群組</option>' +
+            groupsForSelect.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
+          // 若原本選的群組仍存在，就保留；否則退回「全部群組」
+          if (groupsForSelect.includes(prevGroup)) {
+            $('#sel-group').value = prevGroup;
+          } else {
+            $('#sel-group').value = '';
+          }
+        }
+
+        // ---------- KPI 卡片：會依目前篩選（包含小分類）重新計算 ----------
+        renderKPI(all);
+
+        // ---------- 來源表用的 rows（Cur / Prev / YoY） ----------
+        let rowsCur = (all && all.heatmap && all.heatmap.length) ? all.heatmap : (all.heatAgg || []);
+        let rowsPrev = (all && all.heatmap_prev && all.heatmap_prev.length) ? all.heatmap_prev : (all.heatAgg_prev || []);
+        let rowsYoY = (all && all.heatmap_yoy && all.heatmap_yoy.length) ? all.heatmap_yoy : (all.heatAgg_yoy || []);
+
+        // 來源彙總表（內部會再依目前的產品 / 小分類 / 群組篩一次）
+        renderHeatSummary(rowsCur, rowsPrev, rowsYoY, $('#sel-group').value || '');
+
+        // 圓餅圖（來源 / 產品，占比），內部同樣會考慮小分類
+        renderPieBlock(all);
+
+        // 將 all 結果存入前端快取
+        FRONT_CACHE.all.set(key, all);
+
+        // =========================
+        // 2) 再抓 type=drill（頁面明細）
+        // =========================
+        // 下方各頁籤先放「載入中…」（若還沒畫過表格）
+        $$('[data-panel]').forEach(p => {
+          if (!p.querySelector('table')) {
+            p.innerHTML = '<div class="muted">載入中…</div>';
+          }
+        });
+
+        const paramsDrill = {
+          type: 'drill',
+          k: range,
+          product: product,
+          // 一樣同時帶兩種命名，讓後端不論接哪一個都能吃到小分類
+          productDetail: detail,
+          product_detail: detail,
+          source_group: group
+        };
+        const drill = await callAPI(paramsDrill);
+
+        if (drill && drill.ok) {
+          // 重新呼叫 renderKPI 以套用完全一致加總邏輯
+          renderKPI(all, drill);
+
+          // 頁面明細（news/article/comment/lecture/edm/課程）
+          try {
+            renderTabs(
+              drill.pageMetrics || { news_id: [], article_id: [], comment_id: [], lecture_id: [], edm: [], f_subject_no: [], subject_no: [] },
+              drill.pageMetrics_prev || { news_id: [], article_id: [], comment_id: [], lecture_id: [], edm: [], f_subject_no: [], subject_no: [] },
+              drill.pageMetrics_yoy || { news_id: [], article_id: [], comment_id: [], lecture_id: [], edm: [], f_subject_no: [], subject_no: [] }
+            );
+          } catch (e) { console.error("renderTabs error:", e); }
+          // drill 也存進前端快取，讓切換比較模式 / 排序時可以秒重畫
+          FRONT_CACHE.drill.set(key, drill);
+
+          // 若有產品篩選，此時有了精確的 drill 資料，再次渲染 KPI 卡片覆寫掉概略值
+          renderKPI(all, drill);
+
+          try {
+            renderDiagnostics();
+          } catch (e) {
+            console.error('更新診斷清單失敗:', e);
+            const tbody = document.getElementById('diag-tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="muted" style="color:red">渲染診斷清單發生錯誤: ${e.message}</td></tr>`;
+          }
+        } else {
+          // drill 失敗不影響上方 KPI / 來源，只是下方頁面會失敗提示
+          console.warn('Drill API failed:', drill && drill.error ? drill.error : '未知錯誤');
+          $$('[data-panel]').forEach(p => {
+            if (!p.querySelector('table')) {
+              p.innerHTML = '<div class="muted">頁面詳細資料載入失敗</div>';
+            }
+          });
+        }
+
+        $('#msg').textContent = '狀態：成功';
+      } catch (err) {
+        console.error('refreshAll error:', err);
+        $('#msg').textContent = '狀態：失敗 - ' + (err && err.message ? err.message : err);
+      }
+    }
+
+    /* KPI（主值 + 單一對照值 + Δ%） */
+    function renderKPI(all, drill) {
+      // 目前比較模式（none / prev / yoy）
+      const mode = (document.getElementById('sel-compare').value || 'none');
+
+      // 後端原始 KPI（若後面用 rows 重算到值，就會覆寫它）
+      const k = all.kpi || {};
+
+      // 當前前端篩選
+      const selProduct = $('#sel-product').value || '';
+      const selGroup = ($('#sel-group').value || '').replace(/^未分類$/, ''); // 後端未分類是空字串
+      const detail = getSelectedDetail();
+      // —— 依前端篩選，用可用的 rows 重算 KPI（含正確 fallback）——
+      function pickRowsForKPI(all, product, group, which) {
+        const detail = $('#sel-prod-detail').value || '';
+        function filt(arr) {
+          return (arr || []).filter(x =>
+            (!product || String(x.product || '未分類') === product) &&
+            (!group || String(x.source_group || '未分類') === group) &&
+            (!detail || String(x.product_detail || '未分類') === detail)
+          );
+        }
+        // 依優先序挑：byProduct → heatmap(明細) → heatAgg(彙總)
+        const cand = (which === 'prev')
+          ? [all.heatAggByProduct_prev, all.heatmap_prev, all.heatAgg_prev]
+          : (which === 'yoy')
+            ? [all.heatAggByProduct_yoy, all.heatmap_yoy, all.heatAgg_yoy]
+            : [all.heatAggByProduct, all.heatmap, all.heatAgg];
+
+        for (let i = 0; i < cand.length; i++) {
+          const arr = filt(cand[i] || []);
+          if (arr.length) return arr;
+        }
+        // 全都過濾成空 → 退回未過濾版本，避免整個變 0
+        const unfiltered = (which === 'prev')
+          ? [all.heatmap_prev, all.heatAgg_prev]
+          : (which === 'yoy')
+            ? [all.heatmap_yoy, all.heatAgg_yoy]
+            : [all.heatmap, all.heatAgg];
+        for (let i = 0; i < unfiltered.length; i++) {
+          const arr = unfiltered[i] || [];
+          if (arr.length) return arr;
+        }
+        return [];
+      }
+
+      function accFromRows(rows) {
+        return rows.reduce((a, x) => {
+          const sess = Number(x.sessions || 0);
+          a.users += Number(x.users || 0);
+          a.sess += sess;
+          a.erW += sess * Number(x.engagementRate || 0);
+          a.durW += sess * Number(x.avgDuration || 0);
+
+          // GSC KPIs 加總與收集
+          a.gscClicks += Number(x.gscClicks || 0);
+          a.gscImpr += Number(x.gscImpressions || 0);
+          a.gscPosW += Number(x.gscPosition || 0) * Number(x.gscClicks || 0);
+          if (Number(x.gscPosition || 0) > 0) {
+            a.gscPosList.push(Number(x.gscPosition || 0));
+          }
+          return a;
+        }, { users: 0, sess: 0, erW: 0, durW: 0, gscClicks: 0, gscImpr: 0, gscPosW: 0.0, gscPosList: [] });
+      }
+
+      // 只有當選了產品或群組時，才以 rows 來重算（不選時維持後端運算的主 KPI）
+      if (selProduct || selGroup) {
+        const rowsCur = pickRowsForKPI(all, selProduct, selGroup, 'cur');
+        const rowsBase = (mode !== 'none') ? pickRowsForKPI(all, selProduct, selGroup, (mode === 'prev' ? 'prev' : 'yoy')) : [];
+
+        if (rowsCur.length) {
+          const accCur = accFromRows(rowsCur);
+          k.users = accCur.users;
+          k.sessions = accCur.sess;
+          k.pageViews = accCur.sess; // 當篩選時沒有真正的 pageViews，以 sessions 為 proxy
+          k.engagementRate = accCur.sess > 0 ? (accCur.erW / accCur.sess) : 0;
+          k.avgSessionSec = accCur.sess > 0 ? (accCur.durW / accCur.sess) : 0;
+          k.gscClicks = accCur.gscClicks;
+          k.gscImpressions = accCur.gscImpr;
+          k.gscCtr = accCur.gscImpr > 0 ? (accCur.gscClicks / accCur.gscImpr) : 0;
+          k.gscPosition = accCur.gscClicks > 0 ? (accCur.gscPosW / accCur.gscClicks) : 0;
+        } else {
+          // 如果篩選後完全沒資料，全部清零
+          k.users = 0; k.sessions = 0; k.pageViews = 0; k.engagementRate = 0; k.avgSessionSec = 0;
+          k.gscClicks = 0; k.gscImpressions = 0; k.gscCtr = 0; k.gscPosition = 0;
+        }
+
+        // 同步重算比較期基準，讓 Δ% 正確
+        if (rowsBase.length) {
+          const accBase = accFromRows(rowsBase);
+          all.__kpiBaseOverride = {
+            users: accBase.users,
+            pageViews: accBase.sess,
+            sessions: accBase.sess,
+            engagementRate: accBase.sess > 0 ? (accBase.erW / accBase.sess) : 0,
+            avgSessionSec: accBase.sess > 0 ? (accBase.durW / accBase.sess) : 0,
+            gscClicks: accBase.gscClicks,
+            gscImpressions: accBase.gscImpr,
+            gscCtr: accBase.gscImpr > 0 ? (accBase.gscClicks / accBase.gscImpr) : 0,
+            gscPosition: accBase.gscClicks > 0 ? (accBase.gscPosW / accBase.gscClicks) : 0
+          };
+        } else {
+          all.__kpiBaseOverride = {
+            users: 0, pageViews: 0, sessions: 0, engagementRate: 0, avgSessionSec: 0,
+            gscClicks: 0, gscImpressions: 0, gscCtr: 0, gscPosition: 0
+          };
+        }
+      } else {
+        // 沒有任何篩選 → 不覆蓋比較基準
+        delete all.__kpiBaseOverride;
+      }
+
+      // 品質分數
+      const score = Math.round(((k.engagementRate || 0) * 0.7 + Math.min((k.avgSessionSec || 0) / 60, 1) * 0.3) * 100);
+
+      // 主值（防 NaN）
+      $('.kpi-users').textContent = isFinite(k.users) ? (k.users || 0).toLocaleString() : '—';
+      $('.kpi-score').textContent = isFinite(score) ? score : '—';
+      $('.kpi-dur').textContent = isFinite(k.avgSessionSec) ? Math.round(k.avgSessionSec || 0) : '—';
+      $('.kpi-er').textContent = isFinite(k.engagementRate) ? ((k.engagementRate || 0) * 100).toFixed(1) + '%' : '—';
+
+      // GSC KPIs 主值
+      $('.kpi-gsc-clicks').textContent = isFinite(k.gscClicks) ? (k.gscClicks || 0).toLocaleString() : '—';
+      $('.kpi-gsc-impr').textContent = isFinite(k.gscImpressions) ? (k.gscImpressions || 0).toLocaleString() : '—';
+      $('.kpi-gsc-ctr').textContent = isFinite(k.gscCtr) ? ((k.gscCtr || 0) * 100).toFixed(2) + '%' : '—';
+      $('.kpi-gsc-pos').textContent = (isFinite(k.gscPosition) && k.gscPosition > 0) ? k.gscPosition.toFixed(1) : '—';
+
+      // 對照值與 Δ%（若有 __kpiBaseOverride 會被 getComparePack() 讀到）
+      const pack = getComparePack(all, null);
+
+      function paint(baseSel, deltaSel, current, baseVal, fmt, isPosition = false, isPctPoint = false) {
+        const elBase = document.querySelector(baseSel);
+        const elDelta = document.querySelector(deltaSel);
+        if (!elBase || !elDelta) return;
+
+        const resetDeltaClass = () => elDelta.classList.remove('pos', 'neg');
+
+        if (mode === 'none' || !isFinite(baseVal) || baseVal === null || baseVal === undefined) {
+          elBase.textContent = '—';
+          elDelta.textContent = '—';
+          resetDeltaClass();
+          return;
+        }
+
+        elBase.textContent = fmt(baseVal);
+
+        if (isPosition) {
+          // Position 特殊處理：數值下降 (例如排名從 10 變 8) 代表提升 (pos)
+          const diff = current - baseVal;
+          resetDeltaClass();
+          if (diff < 0) {
+            elDelta.textContent = `提升 ${Math.abs(diff).toFixed(1)} 名`;
+            elDelta.classList.add('pos');
+          } else if (diff > 0) {
+            elDelta.textContent = `下滑 ${Math.abs(diff).toFixed(1)} 名`;
+            elDelta.classList.add('neg');
+          } else {
+            elDelta.textContent = '無變動';
+          }
+        } else if (isPctPoint) {
+          const diff = current - baseVal;
+          resetDeltaClass();
+          if (diff === null || !isFinite(diff) || isNaN(diff)) {
+            elDelta.textContent = '—';
+          } else {
+            const sign = diff > 0 ? '+' : '';
+            elDelta.textContent = `${sign}${(diff * 100).toFixed(2)}%`;
+            if (diff > 0) elDelta.classList.add('pos');
+            else if (diff < 0) elDelta.classList.add('neg');
+          }
+        } else {
+          const diff = (baseVal === 0) ? null : ((current - baseVal) / baseVal);
+          resetDeltaClass();
+          if (diff === null || !isFinite(diff)) {
+            elDelta.textContent = '—';
+          } else {
+            elDelta.textContent = pct(diff);
+            elDelta.classList.add(cls(diff));
+          }
+        }
+      }
+
+      paint('.kpi-users-base', '.kpi-users-delta', k.users, pack.kpiBase ? pack.kpiBase.users : NaN, v => Number(v || 0).toLocaleString());
+      const baseScore = pack.kpiBase ? Math.round(((pack.kpiBase.engagementRate || 0) * 0.7 + Math.min((pack.kpiBase.avgSessionSec || 0) / 60, 1) * 0.3) * 100) : NaN;
+      paint('.kpi-score-base', '.kpi-score-delta', score, baseScore, v => v);
+      paint('.kpi-dur-base', '.kpi-dur-delta', k.avgSessionSec, pack.kpiBase ? pack.kpiBase.avgSessionSec : NaN, v => Math.round(v || 0));
+      paint('.kpi-er-base', '.kpi-er-delta', k.engagementRate, pack.kpiBase ? pack.kpiBase.engagementRate : NaN, v => ((v * 100).toFixed(1) + '%'));
+
+      // GSC KPIs 對照組與比較值
+      paint('.kpi-gsc-clicks-base', '.kpi-gsc-clicks-delta', k.gscClicks, pack.kpiBase ? pack.kpiBase.gscClicks : NaN, v => Number(v || 0).toLocaleString());
+      paint('.kpi-gsc-impr-base', '.kpi-gsc-impr-delta', k.gscImpressions, pack.kpiBase ? pack.kpiBase.gscImpressions : NaN, v => Number(v || 0).toLocaleString());
+      paint('.kpi-gsc-ctr-base', '.kpi-gsc-ctr-delta', k.gscCtr, pack.kpiBase ? pack.kpiBase.gscCtr : NaN, v => ((v * 100).toFixed(2) + '%'), false, true);
+      paint('.kpi-gsc-pos-base', '.kpi-gsc-pos-delta', k.gscPosition, pack.kpiBase ? pack.kpiBase.gscPosition : NaN, v => Number(v || 0) > 0 ? (v || 0).toFixed(1) : '—', true);
+    }
+
+
+    /* 來源彙總表（Users/ER/Avg Sec/Avg Sessions 都可顯示單一比較徽章） */
+    function renderHeatSummary(rowsCur, rowsPrev, rowsYoY, selectedGroup) {
+      const mode = (document.getElementById('sel-compare').value || 'none');
+      const baseRows = mode === 'prev' ? rowsPrev : (mode === 'yoy' ? rowsYoY : null);
+
+      const tbody = document.getElementById('heat-tbody');
+      if (!tbody) return; // 防禦性檢查
+      tbody.innerHTML = '';
+
+      const selProd = ($('#sel-product')?.value || '');
+      const selDetail = (typeof getSelectedDetail === 'function') ? getSelectedDetail() : '';
+
+      function agg(rows) {
+        // 🔥 確保輸入是陣列
+        if (!Array.isArray(rows)) {
+          rows = [];
+        }
+
+        const byKey = {};
+        rows.forEach(r => {
+          if (!r || typeof r !== 'object') return; // 跳過無效項目
+          if (selProd && r.product && String(r.product) !== selProd) return;
+          if (selDetail && r.product_detail && String(r.product_detail) !== selDetail) return;
+
+          const group = r.source_group || '';
+          const src = r.source_name || r.source || r.source_raw || '';
+          const sub = r.source_sub ? String(r.source_sub) : '';
+          let key, label;
+          if (!selectedGroup) { key = group + '||' + src; label = src; }
+          else { key = group + '||' + src + '||' + sub; label = sub ? (src + ' / ' + sub) : src; }
+          if (!byKey[key]) byKey[key] = { group, label, sessions: 0, users: 0, erW: 0, durW: 0 };
+          const it = byKey[key], sess = Number(r.sessions || 0);
+          it.sessions += sess; it.users += Number(r.users || 0);
+          it.erW += sess * Number(r.engagementRate || 0);
+          it.durW += sess * Number(r.avgDuration || 0);
+        });
+        Object.keys(byKey).forEach(k => {
+          const x = byKey[k];
+          x.er = x.sessions ? x.erW / x.sessions : 0;
+          x.dur = x.sessions ? x.durW / x.sessions : 0;
+          x.avgSess = x.users ? x.sessions / x.users : 0;
+        });
+        return byKey;
+      }
+
+      const cur = agg(rowsCur);
+      const base = baseRows ? agg(baseRows) : null;
+
+      const list = Object.keys(cur).map(k => {
+        const c = cur[k], b = base ? (base[k] || {}) : {};
+        const dUsers = (base && b.users > 0) ? (c.users - b.users) / b.users : null;
+        const dER = (base && isFinite(b.er) && b.er > 0) ? (c.er - b.er) / b.er : null;
+        const dDur = (base && isFinite(b.dur) && b.dur > 0) ? (c.dur - b.dur) / b.dur : null;
+        const dAvgSess = (base && isFinite(b.avgSess) && b.avgSess > 0) ? (c.avgSess - b.avgSess) / b.avgSess : null;
+        return {
+          group: c.group || '', label: c.label || '',
+          users: c.users || 0, er: c.er || 0, dur: c.dur || 0, avgSess: c.avgSess || 0,
+          dUsers, dER, dDur, dAvgSess
+        };
+      }).sort((a, b) => (b.users || 0) - (a.users || 0) || (b.er || 0) - (a.er || 0));
+
+      const badge = (v) => (v === null || mode === 'none') ? '' : `<span class="badge ${cls(v)}">${pct(v)}</span>`;
+
+      list.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          `<td>${esc(r.group || '')}</td>` +
+          `<th style="text-align:left">${esc(r.label || '')}</th>` +
+          `<td>${(r.users || 0).toLocaleString()}${mode !== 'none' ? `<div>${badge(r.dUsers)}</div>` : ''}</td>` +
+          `<td>${(r.er * 100).toFixed(1)}%${mode !== 'none' ? `<div>${badge(r.dER)}</div>` : ''}</td>` +
+          `<td>${Math.round(r.dur || 0)}${mode !== 'none' ? `<div>${badge(r.dDur)}</div>` : ''}</td>` +
+          `<td>${r.avgSess ? r.avgSess.toFixed(2) : '0.00'}${mode !== 'none' ? `<div>${badge(r.dAvgSess)}</div>` : ''}</td>`;
+        tbody.appendChild(tr);
+      });
+
+      if (!list.length) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="6" class="muted">（此篩選無資料）</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+
+    /* 圓餅圖（來源群組占比，依 Users） — 強制 rows 為陣列 */
+    function renderPie(pie) {
+      const svg = $('#pie-svg'); svg.innerHTML = '';
+      const W = 360, H = 360, CX = W / 2, CY = H / 2, R = 130, R2 = 80;
+
+      const rows = (pie && Array.isArray(pie.rows)) ? pie.rows : [];
+      const total = (pie && typeof pie.totalUsersApprox === 'number')
+        ? pie.totalUsersApprox
+        : rows.reduce((s, r) => s + (Number(r.users) || 0), 0);
+
+      let acc = 0;
+      // 鮮豔一點（S=65 L=55）
+      const color = (i) => `hsl(${(i * 53) % 360} 65% 55%)`;
+
+      rows.forEach((r, i) => {
+        const val = Number(r.users) || 0;
+        const frac = total ? (val / total) : 0;
+        const a0 = acc * 2 * Math.PI, a1 = (acc + frac) * 2 * Math.PI;
+        acc += frac;
+
+        const x0 = CX + R * Math.cos(a0), y0 = CY + R * Math.sin(a0);
+        const x1 = CX + R * Math.cos(a1), y1 = CY + R * Math.sin(a1);
+        const x2 = CX + R2 * Math.cos(a1), y2 = CY + R2 * Math.sin(a1);
+        const x3 = CX + R2 * Math.cos(a0), y3 = CY + R2 * Math.sin(a0);
+        const largeArc = (a1 - a0) > Math.PI ? 1 : 0;
+
+        const path = [
+          `M ${x0} ${y0}`,
+          `A ${R} ${R} 0 ${largeArc} 1 ${x1} ${y1}`,
+          `L ${x2} ${y2}`,
+          `A ${R2} ${R2} 0 ${largeArc} 0 ${x3} ${y3}`,
+          'Z'
+        ].join(' ');
+        const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        p.setAttribute('d', path);
+        p.setAttribute('fill', color(i));
+        p.setAttribute('stroke', '#888');
+        svg.appendChild(p);
+      });
+
+      const legend = $('#pie-legend'); legend.innerHTML = '';
+      rows.forEach((r, i) => {
+        const span = document.createElement('span');
+        span.className = 'pill';
+        span.style.borderColor = '#ccc';
+        span.innerHTML =
+          `<span style="display:inline-block;width:10px;height:10px;background:hsl(${(i * 53) % 360} 65% 55%);margin-right:6px;border-radius:2px;vertical-align:middle;"></span>` +
+          `${esc(r.group || '未分類')}：${(Number(r.users) || 0).toLocaleString()}${total ? ' (' + ((Number(r.users) * 100 / total).toFixed(1)) + '%)' : ''}`;
+        legend.appendChild(span);
+      });
+    }
+
+    // 依目前篩選條件，組出圓餅圖用的 rows（來源 / 產品）
+    // all  : 後端回來的 all payload
+    // dim  : 'group' = 依來源群組, 'product' = 依產品 / 小分類
+    // which: 'cur' | 'prev' | 'yoy'
+    function getPieRows(all, dim, which) {
+      // 目前 UI 上的篩選條件
+      const prod = document.getElementById('sel-product')?.value || '';
+      // ★ 統一用 getSelectedDetail()，實際 id 是 sel-prod-detail
+      const pdet = (typeof getSelectedDetail === 'function')
+        ? (getSelectedDetail() || '')
+        : (document.getElementById('sel-prod-detail')?.value || '');
+      const hasProd = !!prod;
+      const hasDetail = !!pdet;
+
+      // 小工具：安全取得陣列
+      const pickArray = (...candidates) => {
+        for (const a of candidates) {
+          if (Array.isArray(a)) return a;
+        }
+        return [];
+      };
+
+      let rows = [];
+      let total = 0;
+
+      if (dim === 'group') {
+        // ==========================
+        // A) 整體流量來源圓餅圖（依來源群組）
+        // ==========================
+        // 規則：
+        // - 沒選產品 / 小分類 → 用全站 heatAgg（或 fallback heatmap）
+        // - 有選產品 / 小分類 → 用已套 product / product_detail 篩選後的 heatAggByProduct
+        //   （後端 deriveAllFromL2_ / computeAllPayload 已經先照產品條件 filter 過）
+        let arr;
+        if (which === 'prev') {
+          arr = pickArray(all.heatmap_prev, all.heatAgg_prev);
+        } else if (which === 'yoy') {
+          arr = pickArray(all.heatmap_yoy, all.heatAgg_yoy);
+        } else { // 'cur'
+          arr = pickArray(all.heatmap, all.heatAgg);
+        }
+
+        const filtered = arr.filter(r => (!prod || String(r.product || '') === prod) && (!pdet || String(r.product_detail || '') === pdet));
+
+        const buckets = {};
+        filtered.forEach(r => {
+          if (!r) return;
+          const key = String(r.source_group || ''); // 群組名稱（可為空字串）
+          buckets[key] = (buckets[key] || 0) + Number(r.users || 0);
+        });
+
+        rows = Object.keys(buckets).map(k => ({
+          group: k || '未分類',
+          users: buckets[k]
+        })).sort((a, b) => (b.users || 0) - (a.users || 0));
+
+        total = rows.reduce((sum, x) => sum + (Number(x.users) || 0), 0);
+
+      } else {
+        // ==========================
+        // B) 產品 chip 圓餅圖
+        // ==========================
+        // 規則：
+        // - 沒選產品：全站各產品佔比（切片 = product）
+        // - 有選產品（不管有沒有小分類）：
+        //   → 只過這個 product，切片改用 product_detail
+        if (!hasProd) {
+          // --- B-1: 沒選產品 → 全站各產品佔比 ---
+          let arr;
+          if (which === 'prev') {
+            arr = pickArray(all.heatmap_prev, all.heatAggByProduct_prev);
+          } else if (which === 'yoy') {
+            arr = pickArray(all.heatmap_yoy, all.heatAggByProduct_yoy);
+          } else {
+            arr = pickArray(all.heatmap, all.heatAggByProduct);
+          }
+
+          const buckets = {};
+          arr.forEach(r => {
+            if (!r) return;
+            const key = String(r.product || '未分類'); // 各產品
+            buckets[key] = (buckets[key] || 0) + Number(r.users || 0);
+          });
+
+          rows = Object.keys(buckets).map(k => ({
+            group: k || '未分類',    // 下游一律用 .group 當標籤欄位
+            users: buckets[k]
+          })).sort((a, b) => (b.users || 0) - (a.users || 0));
+
+          total = rows.reduce((sum, x) => sum + (Number(x.users) || 0), 0);
+
+        } else {
+          // --- B-2: 有選產品 → 該產品底下所有 product_detail 的佔比 ---
+          // 這裡需要 product_detail，所以一律用 heatmap 系列（已含 product / product_detail）
+          let arr;
+          if (which === 'prev') {
+            arr = pickArray(all.heatmap_prev, all.heatAggByProduct_prev);
+          } else if (which === 'yoy') {
+            arr = pickArray(all.heatmap_yoy, all.heatAggByProduct_yoy);
+          } else {
+            arr = pickArray(all.heatmap, all.heatAggByProduct);
+          }
+
+          // 只保留選到的 product
+          const filtered = arr.filter(r => String(r.product || '未分類') === prod);
+
+          const buckets = {};
+          filtered.forEach(r => {
+            if (!r) return;
+            const key = String(r.product_detail || '未分類'); // 小分類
+            buckets[key] = (buckets[key] || 0) + Number(r.users || 0);
+          });
+
+          rows = Object.keys(buckets).map(k => ({
+            // 一樣用 .group 當標籤欄位，這裡實際上是「小分類名稱」
+            group: k || '未分類',
+            users: buckets[k]
+          })).sort((a, b) => (b.users || 0) - (a.users || 0));
+
+          total = rows.reduce((sum, x) => sum + (Number(x.users) || 0), 0);
+        }
+      }
+
+      return { rows, total };
+    }
+
+    function renderPieTable(rowsCur, rowsBase, labelName) {
+      const mode = (document.getElementById('sel-compare')?.value || 'none');
+      const baseMap = {};
+      (Array.isArray(rowsBase) ? rowsBase : []).forEach(r => {
+        baseMap[String(r.group || '')] = Number(r.users || 0);
+      });
+
+      let html = '<table class="heatmap"><thead><tr>' +
+        `<th style="width:180px">${esc(labelName)}</th>` +
+        '<th style="width:160px">Users</th>' +
+        '<th style="width:160px">比較</th>' +
+        '</tr></thead><tbody>';
+
+      if (!rowsCur || !rowsCur.length) {
+        html += '<tr><td colspan="3" class="muted">（無資料）</td></tr>';
+      } else {
+        rowsCur.forEach(r => {
+          const cur = Number(r.users || 0);
+          const base = baseMap[String(r.group || '')] || 0;
+          const d = (mode !== 'none' && base > 0) ? ((cur - base) / base) : null;
+          html += '<tr>' +
+            `<th style="text-align:left">${esc(r.group || '未分類')}</th>` +
+            `<td>${cur.toLocaleString()}${d === null ? '' : `<div class="badge ${cls(d)}">${pct(d)}</div>`}</td>` +
+            `<td>${mode === 'none' ? '—' : base.toLocaleString()}</td>` +
+            '</tr>';
+        });
+      }
+
+      html += '</tbody></table>';
+      $('#pie-table').innerHTML = html;
+    }
+
+    function renderPieBlock(all) {
+      updatePieControlsUI();
+      const mode = (document.getElementById('sel-compare')?.value || 'none');
+      const cur = getPieRows(all, PIE_DIM, 'cur');
+      const base = (mode === 'prev' || mode === 'yoy') ? getPieRows(all, PIE_DIM, mode) : { rows: [], total: 0 };
+
+      if (PIE_VIEW === 'chart') {
+        $('#pie-svg').style.display = 'block';
+        $('#pie-table').style.display = 'none';
+        $('#pie-legend').style.display = '';
+        renderPie({ rows: cur.rows, totalUsersApprox: cur.total });
+      } else {
+        $('#pie-svg').style.display = 'none';
+        $('#pie-table').style.display = 'block';
+        $('#pie-legend').style.display = 'none';
+        const prodLabel = (document.getElementById('sel-product')?.value || '') ? '小分類' : '產品';
+        renderPieTable(cur.rows, base.rows, PIE_DIM === 'group' ? '來源群組' : prodLabel);
+      }
+    }
+
+    function updatePieControlsUI() {
+      const prod = document.getElementById('sel-product')?.value || '';
+      $$('.chip[data-pie-dim]').forEach(el => {
+        el.classList.toggle('active', el.dataset.pieDim === PIE_DIM);
+        if (el.dataset.pieDim === 'product') {
+          el.textContent = prod ? '小分類' : '產品';
+        }
+      });
+      const btn = $('#btn-pie-toggle');
+      if (btn) btn.textContent = (PIE_VIEW === 'chart' ? '表格' : '圖表');
+    }
+
+    /* 將 rows（heatmap / heatAggByProduct 皆可）聚合成「產品 Users 占比」的圓餅資料 */
+    function buildProductPie(rows) {
+      const sumBy = Object.create(null);
+      (rows || []).forEach(r => {
+        if (!r) return;
+
+        const hasC = !!String(r.product || '').trim();
+        // heatmap 明細列才有 category；彙總列（heatAggByProduct）沒有 category，已由後端過濾
+        const hasE = (Object.prototype.hasOwnProperty.call(r, 'category'))
+          ? !!String(r.category || '').trim()
+          : true;
+
+        // E、C 都未命中 → 不納入產品圓餅
+        if (!hasC && !hasE) return;
+
+        // 有 E 無 C → 累加到空字串（前端顯示『未分類』）
+        const prod = hasC ? String(r.product) : '';
+        const u = Number(r.users || 0);
+        sumBy[prod] = (sumBy[prod] || 0) + (isFinite(u) ? u : 0);
+      });
+
+      const out = Object.keys(sumBy)
+        .map(p => ({ group: p || '未分類', users: sumBy[p] }))
+        .sort((a, b) => (b.users || 0) - (a.users || 0));
+
+      const total = out.reduce((s, x) => s + (Number(x.users) || 0), 0);
+      return { totalUsersApprox: total, rows: out };
+    }
+
+
+    /* 依目前 PIE_MODE 決定畫「來源圓餅」或「產品圓餅」 */
+    function renderPieByMode(all) {
+      const hint = document.getElementById('pie-hint');
+      if (!all) { renderPie({ rows: [] }); if (hint) hint.textContent = ''; return; }
+
+      if (PIE_MODE === 'source') {
+        if (hint) hint.textContent = '';
+        return renderPie(all.pie || { rows: [] });
+      }
+
+      // PIE_MODE === 'product'
+      const baseRows = (Array.isArray(all.heatmap) && all.heatmap.length)
+        ? all.heatmap
+        : (Array.isArray(all.heatAggByProduct) ? all.heatAggByProduct : []);
+
+      const selProd = (document.getElementById('sel-product')?.value || '');
+      if (hint) {
+        hint.textContent = selProd
+          ? '提示：目前已選擇產品篩選，僅顯示該產品的占比；把「產品」下拉切回「全部產品」可查看所有產品的占比。'
+          : '';
+      }
+
+      const pie = buildProductPie(baseRows);
+      return renderPie(pie);
+    }
+
+
+    /* Tabs 切換 */
+    function bindTabs() {
+      $('#tabs').addEventListener('click', (e) => {
+        const tab = e.target.closest('.tab'); if (!tab) return;
+        switchTab(tab.dataset.tab);
+      });
+    }
+
+    /**
+     * 渲染下方 6 類頁籤表格：
+     * - news_id / article_id / comment_id / lecture_id / edm
+     * - course（= f_subject_no + subject_no）
+     * 支援比較：none / prev / yoy （讀取 #sel-compare）
+     */
+    function renderTabs(metrics, metricsPrev, metricsYoY) {
+      metrics = metrics || {};
+      metricsPrev = metricsPrev || {};
+      metricsYoY = metricsYoY || {};
+
+      // ==== 小工具 ====
+      const esc = (s) => String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      const bdgPct = (v) => {
+        if (v == null) return '';
+        if (!isFinite(v)) return `<span class="badge pos">+∞%</span>`;
+        const cls = v > 0 ? 'pos' : (v < 0 ? 'neg' : 'equal');
+        const sign = (v * 100) >= 0 ? '+' : '';
+        return `<span class="badge ${cls}">${sign}${(v * 100).toFixed(1)}%</span>`;
+      };
+      const fmtSigned = (n) => ((n > 0 ? '+' : '') + (Math.round(n) || 0).toLocaleString());
+      const bdgNum = (n) => n == null ? '' : `<span class="badge ${(n > 0 ? 'pos' : (n < 0 ? 'neg' : 'equal'))}">${fmtSigned(n)}</span>`;
+
+      const mode = (typeof SORT_MODE === 'string' ? SORT_MODE : 'views_desc');
+      const isPctMode = (mode === 'drop_pct' || mode === 'rise_pct');
+
+      // 匯總（views、加權ER、加權AvgSec）
+      function sumPanel(_arr) {
+        let views = 0, erW = 0, secW = 0;
+        (_arr || []).forEach(r => {
+          const v = +r.views || 0;
+          views += v;
+          erW += v * (+r.engagementRate || 0);
+          secW += v * (+r.avgSec || 0);
+        });
+        return { views, er: views ? (erW / views) : 0, sec: views ? (secW / views) : 0 };
+      }
+
+      // 依排序模式排序；基準缺失時 baseViews=0（視為新頁面）
+      function sortByMode(arr, baseIdx) {
+        const mode = (typeof SORT_MODE === 'string' ? SORT_MODE : 'views_desc');
+        const idKey = (v) => String(v == null ? '' : v).trim();
+
+        // 預先算出需要的欄位，並標示「是否有%徽章」
+        const items = (arr || []).map(r => {
+          const b = baseIdx[idKey(r.id)] || null;
+          const baseViews = +(b?.views || 0);
+          const curViews = +(r.views || 0);
+          const deltaAbs = curViews - baseViews;
+          let deltaPct = 0;
+          if (baseViews > 0) deltaPct = deltaAbs / baseViews;
+          else if (curViews > 0) deltaPct = Number.POSITIVE_INFINITY; // 去年無、今年有
+          else deltaPct = 0;
+
+          const hasPctBadge = !!b && baseViews > 0; // 只有這種情況真的會顯示 % 徽章
+          return {
+            ...r,
+            _curViews: curViews,
+            _deltaAbs: deltaAbs,
+            _deltaPct: deltaPct,
+            _hasPctBadge: hasPctBadge
+          };
+        });
+
+        // % 模式：硬分組 → 先有徽章，再無徽章
+        if (mode === 'drop_pct' || mode === 'rise_pct') {
+          const withBadge = items.filter(x => x._hasPctBadge);
+          const without = items.filter(x => !x._hasPctBadge);
+
+          // 有徽章：依 % 排序（drop=由小到大；rise=由大到小），再用當期人次當次要鍵
+          withBadge.sort((a, b) => {
+            if (a._deltaPct !== b._deltaPct) return (mode === 'drop_pct' ? a._deltaPct - b._deltaPct : b._deltaPct - a._deltaPct);
+            return b._curViews - a._curViews;
+          });
+
+          // 沒徽章：只用當期人次(高→低) 以免卡在最上面
+          without.sort((a, b) => b._curViews - a._curViews);
+
+          return withBadge.concat(without);
+        }
+
+        // 人次模式
+        if (mode === 'drop_abs') {
+          return items.sort((a, b) => {
+            if (a._deltaAbs !== b._deltaAbs) return a._deltaAbs - b._deltaAbs; // 下降最多在前
+            return b._curViews - a._curViews;
+          });
+        }
+        if (mode === 'rise_abs') {
+          return items.sort((a, b) => {
+            if (a._deltaAbs !== b._deltaAbs) return b._deltaAbs - a._deltaAbs; // 上升最多在前
+            return b._curViews - a._curViews;
+          });
+        }
+
+        if (mode === 'gsc_impr_desc') return items.sort((a, b) => (b.gscImpressions || 0) - (a.gscImpressions || 0));
+        if (mode === 'gsc_impr_asc') return items.sort((a, b) => (a.gscImpressions || 0) - (b.gscImpressions || 0));
+        if (mode === 'gsc_clicks_desc') return items.sort((a, b) => (b.gscClicks || 0) - (a.gscClicks || 0));
+        if (mode === 'gsc_clicks_asc') return items.sort((a, b) => (a.gscClicks || 0) - (b.gscClicks || 0));
+        if (mode === 'gsc_ctr_desc') return items.sort((a, b) => (b.gscCtr || 0) - (a.gscCtr || 0));
+        if (mode === 'gsc_ctr_asc') return items.sort((a, b) => (a.gscCtr || 0) - (b.gscCtr || 0));
+        if (mode === 'gsc_pos_desc') return items.sort((a, b) => (b.gscPosition || 0) - (a.gscPosition || 0));
+        if (mode === 'gsc_pos_asc') return items.sort((a, b) => {
+          const posA = a.gscPosition > 0 ? a.gscPosition : Infinity;
+          const posB = b.gscPosition > 0 ? b.gscPosition : Infinity;
+          return posA - posB;
+        });
+        if (mode === 'views_asc') return items.sort((a, b) => a._curViews - b._curViews);
+
+        // 預設：當期人次(高→低)
+        return items.sort((a, b) => b._curViews - a._curViews);
+      }
+
+
+      // 單一面板繪製
+      function fill(panelKey, arr, baseArr, realCat) {
+        const host = document.querySelector(`[data-panel="${panelKey}"]`);
+        if (!host) return;
+
+        arr = Array.isArray(arr) ? arr : [];
+        baseArr = Array.isArray(baseArr) ? baseArr : null;
+
+        // === 工具 ===
+        const idKey = (v) => String(v == null ? '' : v).trim();
+        const mode = (typeof SORT_MODE === 'string' ? SORT_MODE : 'views_desc');
+        const isPctMode = (mode === 'drop_pct' || mode === 'rise_pct');
+
+        const esc = (s) => String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const bdgPct = (v) => {
+          if (v == null || !isFinite(v)) return v === Infinity ? `<span class="badge pos">+∞%</span>` : '';
+          const cls = v > 0 ? 'pos' : (v < 0 ? 'neg' : 'equal');
+          const sign = (v * 100) >= 0 ? '+' : '';
+          return `<span class="badge ${cls}">${sign}${(v * 100).toFixed(1)}%</span>`;
+        };
+        const bdgPct2 = (v) => {
+          if (v == null || !isFinite(v)) return v === Infinity ? `<span class="badge pos">+∞%</span>` : '';
+          const cls = v > 0 ? 'pos' : (v < 0 ? 'neg' : 'equal');
+          const sign = (v * 100) >= 0 ? '+' : '';
+          return `<span class="badge ${cls}">${sign}${(v * 100).toFixed(2)}%</span>`;
+        };
+        const fmtSigned = (n) => ((n > 0 ? '+' : '') + (Math.round(n) || 0).toLocaleString());
+        const bdgNum = (n) => n == null ? '' : `<span class="badge ${(n > 0 ? 'pos' : (n < 0 ? 'neg' : 'equal'))}">${fmtSigned(n)}</span>`;
+
+        // 基準索引
+        const baseIdx = {};
+        (baseArr || []).forEach(r => { baseIdx[idKey(r.id)] = r; });
+
+        // 匯總
+        function sumPanel(_arr) {
+          let views = 0, erW = 0, secW = 0;
+          let gscClicks = 0, gscImpr = 0, gscPosW = 0, posCount = 0;
+          let sumSess = 0;
+          (_arr || []).forEach(r => {
+            const v = +r.views || 0;
+            const sess = +(r.sessions || r.views || 0);
+            views += v;
+            sumSess += sess;
+            erW += sess * (+r.engagementRate || 0);
+            secW += sess * (+r.avgSec || 0);
+
+            gscClicks += +(r.gscClicks || 0);
+            gscImpr += +(r.gscImpressions || 0);
+            if (+(r.gscPosition || 0) > 0) {
+              gscPosW += +(r.gscPosition || 0) * +(r.gscClicks || 0);
+              posCount++;
+            }
+          });
+
+          let avgPos = 0;
+          if (gscClicks > 0) avgPos = gscPosW / gscClicks;
+
+          return {
+            views,
+            er: sumSess ? (erW / sumSess) : 0,
+            sec: sumSess ? (secW / sumSess) : 0,
+            gscClicks,
+            gscImpr,
+            gscCtr: gscImpr ? (gscClicks / gscImpr) : 0,
+            gscPos: avgPos
+          };
+        }
+
+        const curTotal = sumPanel(arr);
+        const baseTotal = baseArr ? sumPanel(baseArr) : null;
+
+        // 總計列（Views：依模式顯示 % 或 ±人次）
+        const dViewsTotAbs = baseTotal ? (curTotal.views - baseTotal.views) : null;
+        let dViewsTotPct = null;
+        if (baseTotal) {
+          if (baseTotal.views > 0) dViewsTotPct = dViewsTotAbs / baseTotal.views;
+          else if (baseTotal.views === 0 && curTotal.views > 0) dViewsTotPct = Infinity;
+          else dViewsTotPct = 0;
+        }
+        const dERTot = (baseTotal && baseTotal.er > 0) ? (curTotal.er - baseTotal.er) : null;
+        const dSecTot = (baseTotal && baseTotal.sec > 0) ? (curTotal.sec - baseTotal.sec) / baseTotal.sec : null;
+
+        // GSC 總計比較
+        let dGscClicks = baseTotal ? (curTotal.gscClicks - baseTotal.gscClicks) : null;
+        let dGscImpr = baseTotal ? (curTotal.gscImpr - baseTotal.gscImpr) : null;
+        let dGscCtr = baseTotal ? (curTotal.gscCtr - baseTotal.gscCtr) : null;
+        let dGscPos = (baseTotal && baseTotal.gscPos > 0 && curTotal.gscPos > 0) ? (curTotal.gscPos - baseTotal.gscPos) : null;
+
+        const totalRowHtml = `
+      <tr class="sum">
+        <td>合計</td>
+        <td></td>
+        <td class="ga4-only">${(curTotal.views || 0).toLocaleString()}${baseTotal ? `<div>${isPctMode ? bdgPct(dViewsTotPct) : bdgNum(dViewsTotAbs)}</div>` : ''}</td>
+        <td class="ga4-only">${((curTotal.er || 0) * 100).toFixed(1)}%${dERTot !== null ? `<div>${bdgPct(dERTot)}</div>` : ''}</td>
+        <td class="ga4-only">${Math.round(curTotal.sec || 0)}${dSecTot !== null ? `<div>${bdgPct(dSecTot)}</div>` : ''}</td>
+        <!-- GSC 合計 -->
+        <td class="gsc-only">${(curTotal.gscImpr || 0).toLocaleString()}${baseTotal ? `<div>${bdgNum(dGscImpr)}</div>` : ''}</td>
+        <td class="gsc-only">${(curTotal.gscClicks || 0).toLocaleString()}${baseTotal ? `<div>${bdgNum(dGscClicks)}</div>` : ''}</td>
+        <td class="gsc-only">${((curTotal.gscCtr || 0) * 100).toFixed(2)}%${baseTotal && dGscCtr !== null ? `<div>${bdgPct2(dGscCtr)}</div>` : ''}</td>
+        <td class="gsc-only">${curTotal.gscPos > 0 ? curTotal.gscPos.toFixed(1) : '—'}${baseTotal && dGscPos !== null ? `<div><span class="badge ${dGscPos < 0 ? 'pos' : (dGscPos > 0 ? 'neg' : 'equal')}">${dGscPos < 0 ? `+${Math.abs(dGscPos).toFixed(1)}` : (dGscPos > 0 ? `-${Math.abs(dGscPos).toFixed(1)}` : '0.0')}</span></div>` : ''}</td>
+      </tr>`;
+
+        // 構建可排序資料
+        const items = (arr || []).map(r => {
+          const k = idKey(r.id);
+          const b = baseIdx[k] || null;
+          const baseViews = +(b?.views || 0);
+          const curViews = +(r.views || 0);
+          const deltaAbs = curViews - baseViews;
+          let deltaPct = null;
+          if (baseArr) {
+            if (baseViews > 0) deltaPct = deltaAbs / baseViews;
+            else if (baseViews === 0 && curViews > 0) deltaPct = Infinity;
+            else deltaPct = 0;
+          }
+          const hasPctBadge = !!b && baseViews > 0; // 只有這種情況會顯示 % 徽章
+
+          // GSC 指標與對比
+          const baseClicks = +(b?.gscClicks || 0);
+          const curClicks = +(r.gscClicks || 0);
+          const deltaClicks = curClicks - baseClicks;
+
+          const baseImpr = +(b?.gscImpressions || 0);
+          const curImpr = +(r.gscImpressions || 0);
+          const deltaImpr = curImpr - baseImpr;
+
+          const baseCtr = +(b?.gscCtr || 0);
+          const curCtr = +(r.gscCtr || 0);
+          const deltaCtr = baseArr ? (curCtr - baseCtr) : null;
+
+          const basePos = +(b?.gscPosition || 0);
+          const curPos = +(r.gscPosition || 0);
+          const deltaPos = (basePos > 0 && curPos > 0) ? (curPos - basePos) : null;
+
+          return {
+            raw: r,
+            id: k,
+            title: r.name || r.id || '',
+            curViews, baseViews, deltaAbs, deltaPct, hasPctBadge,
+            erCur: +(r.engagementRate || 0), erBase: +(b?.engagementRate || 0),
+            secCur: +(r.avgSec || 0), secBase: +(b?.avgSec || 0),
+            // GSC
+            gscClicks: curClicks, deltaClicks,
+            gscImpr: curImpr, deltaImpr,
+            gscCtr: curCtr, deltaCtr,
+            gscPos: curPos, deltaPos,
+            gscPageUrl: r.gscPageUrl || '',
+            category: r.category || '',
+            diagnostics: r.diagnostics || []
+          };
+        });
+
+        let sorted;
+        if (isPctMode) {
+          const withBadge = items.filter(x => x.hasPctBadge);
+          const without = items.filter(x => !x.hasPctBadge);
+          withBadge.sort((a, b) => {
+            if (a.deltaPct !== b.deltaPct) return (mode === 'drop_pct') ? (a.deltaPct - b.deltaPct) : (b.deltaPct - a.deltaPct);
+            return b.curViews - a.curViews;
+          });
+          without.sort((a, b) => b.curViews - a.curViews);
+          sorted = withBadge.concat(without);
+        } else if (mode === 'drop_abs') {
+          sorted = items.sort((a, b) => {
+            if (a.deltaAbs !== b.deltaAbs) return a.deltaAbs - b.deltaAbs;
+            return b.curViews - a.curViews;
+          });
+        } else if (mode === 'rise_abs') {
+          sorted = items.sort((a, b) => {
+            if (a.deltaAbs !== b.deltaAbs) return b.deltaAbs - a.deltaAbs;
+            return b.curViews - a.curViews;
+          });
+        } else if (mode === 'gsc_impr_desc') {
+          sorted = items.sort((a, b) => b.gscImpr - a.gscImpr);
+        } else if (mode === 'gsc_impr_asc') {
+          sorted = items.sort((a, b) => a.gscImpr - b.gscImpr);
+        } else if (mode === 'gsc_clicks_desc') {
+          sorted = items.sort((a, b) => b.gscClicks - a.gscClicks);
+        } else if (mode === 'gsc_clicks_asc') {
+          sorted = items.sort((a, b) => a.gscClicks - b.gscClicks);
+        } else if (mode === 'gsc_ctr_desc') {
+          sorted = items.sort((a, b) => b.gscCtr - a.gscCtr);
+        } else if (mode === 'gsc_ctr_asc') {
+          sorted = items.sort((a, b) => a.gscCtr - b.gscCtr);
+        } else if (mode === 'gsc_pos_desc') {
+          sorted = items.sort((a, b) => b.gscPos - a.gscPos);
+        } else if (mode === 'gsc_pos_asc') {
+          sorted = items.sort((a, b) => {
+            const posA = a.gscPos > 0 ? a.gscPos : Infinity;
+            const posB = b.gscPos > 0 ? b.gscPos : Infinity;
+            return posA - posB;
+          });
+        } else {
+          sorted = items.sort((a, b) => b.curViews - a.curViews); // 預設：當期人次高→低
+        }
+
+        // 列渲染：Views 徽章依模式；ER & Sec 需有有效基準才顯示 %
+        const rowsHtml = sorted.map(x => {
+          let viewsBadge = '';
+          if (baseArr) {
+            if (isPctMode) {
+              if (x.hasPctBadge) viewsBadge = `<div>${bdgPct(x.deltaPct)}</div>`;
+            } else {
+              viewsBadge = `<div>${bdgNum(x.deltaAbs)}</div>`;
+            }
+          }
+
+          const dER = (x.erBase > 0) ? (x.erCur - x.erBase) : null;
+          const dSec = (x.secBase > 0) ? (x.secCur - x.secBase) / x.secBase : null;
+
+          // GSC 列比較徽章
+          let clicksBadge = '';
+          let imprBadge = '';
+          let ctrBadge = '';
+          let posBadge = '';
+          if (baseArr) {
+            clicksBadge = `<div>${bdgNum(x.deltaClicks)}</div>`;
+            imprBadge = `<div>${bdgNum(x.deltaImpr)}</div>`;
+            if (x.deltaCtr !== null) ctrBadge = `<div>${bdgPct2(x.deltaCtr)}</div>`;
+            if (x.deltaPos !== null) {
+              const clsName = x.deltaPos < 0 ? 'pos' : (x.deltaPos > 0 ? 'neg' : 'equal');
+              const text = x.deltaPos < 0 ? `+${Math.abs(x.deltaPos).toFixed(1)}` : (x.deltaPos > 0 ? `-${Math.abs(x.deltaPos).toFixed(1)}` : '0.0');
+              posBadge = `<div><span class="badge ${clsName}">${text}</span></div>`;
+            }
+          }
+
+          let diagHTML = '';
+          if (x.diagnostics.length > 0) {
+            diagHTML = ` <span style="color:red; font-size:11px; cursor:help;" title="偵測到流量/SEO異常: ${x.diagnostics.join(', ')}">⚠️</span>`;
+          }
+
+          const itemCat = x.category || realCat || panelKey;
+          return (
+            `<tr class="clickable-row" data-id="${esc(x.id)}" data-cat="${esc(itemCat)}" onclick="togglePageBreakdown(this, '${esc(x.id)}', '${esc(itemCat)}', '${esc(x.gscPageUrl)}')">` +
+            `<td>${esc(x.id)}</td>` +
+            `<td style="text-align:left">${esc(x.title)}${diagHTML}</td>` +
+            `<td class="ga4-only">${x.curViews.toLocaleString()}${viewsBadge}</td>` +
+            `<td class="ga4-only">${(x.erCur * 100).toFixed(1)}%${dER !== null ? `<div>${bdgPct(dER)}</div>` : ''}</td>` +
+            `<td class="ga4-only">${Math.round(x.secCur)}${dSec !== null ? `<div>${bdgPct(dSec)}</div>` : ''}</td>` +
+
+            // GSC 欄位渲染
+            `<td class="gsc-only">${x.gscImpr.toLocaleString()}${imprBadge}</td>` +
+            `<td class="gsc-only">${x.gscClicks.toLocaleString()}${clicksBadge}</td>` +
+            `<td class="gsc-only">${(x.gscCtr * 100).toFixed(2)}%${ctrBadge}</td>` +
+            `<td class="gsc-only">${x.gscPos > 0 ? x.gscPos.toFixed(1) : '—'}${posBadge}</td>` +
+            '</tr>'
+          );
+        }).join('');
+
+        const html =
+          '<table class="heatmap"><thead><tr>' +
+          '<th style="width:100px">ID</th>' +
+          '<th>標題</th>' +
+          '<th class="ga4-only" style="width:100px; cursor:pointer;" onclick="window.handleSortClick(\'views_desc\')">瀏覽次數</th>' +
+          '<th class="ga4-only" style="width:85px">參與率</th>' +
+          '<th class="ga4-only" style="width:80px">Avg Sec</th>' +
+          // GSC headers
+          '<th class="gsc-only" style="width:140px; background-color:#eff6ff; cursor:pointer;" onclick="window.handleSortClick(\'gsc_impr_desc\')">曝光</th>' +
+          '<th class="gsc-only" style="width:140px; background-color:#eff6ff; cursor:pointer;" onclick="window.handleSortClick(\'gsc_clicks_desc\')">點擊</th>' +
+          '<th class="gsc-only" style="width:120px; background-color:#eff6ff; cursor:pointer;" onclick="window.handleSortClick(\'gsc_ctr_desc\')">CTR</th>' +
+          '<th class="gsc-only" style="width:100px; background-color:#eff6ff; cursor:pointer;" onclick="window.handleSortClick(\'gsc_pos_asc\')">排名</th>' +
+          '</tr></thead><tbody>' +
+          totalRowHtml + rowsHtml +
+          '</tbody></table>';
+
+        host.innerHTML = html;
+      }
+
+
+
+      // === 比對基準集 ===
+      const compareMode = (document.getElementById('sel-compare')?.value || 'none');
+      const baseSet = compareMode === 'prev' ? metricsPrev
+        : compareMode === 'yoy' ? metricsYoY
+          : null;
+
+      // === 各面板：news/article/comment/lecture/edm ===
+      fill('news', metrics.news_id || [], baseSet ? (baseSet.news_id || []) : null, 'news_id');
+      fill('article', metrics.article_id || [], baseSet ? (baseSet.article_id || []) : null, 'article_id');
+      fill('comment', metrics.comment_id || [], baseSet ? (baseSet.comment_id || []) : null, 'comment_id');
+      fill('lecture', metrics.lecture_id || [], baseSet ? (baseSet.lecture_id || []) : null, 'lecture_id');
+      fill('edm', metrics.edm || [], baseSet ? (baseSet.edm || []) : null, 'edm');
+
+      // === 課程：f_subject_no + subject_no 合併 ===
+      const courseCur = []
+        .concat(metrics.f_subject_no || [])
+        .concat(metrics.subject_no || []);
+      const courseBase = baseSet ? []
+        .concat(baseSet.f_subject_no || [])
+        .concat(baseSet.subject_no || []) : null;
+      fill('course', courseCur, courseBase);
+
+      // === 「總計」面板（分類匯總；Views 依模式顯示 % 或 ±人次） ===
+      (function renderTotalPanel() {
+        const host = document.querySelector('[data-panel="total"]');
+        if (!host) return;
+
+        const defs = [
+          { key: 'news_id', label: '新品新聞 (news_id)', cur: (metrics.news_id || []), base: baseSet ? (baseSet.news_id || []) : null },
+          { key: 'article_id', label: '保養文章 (article_id)', cur: (metrics.article_id || []), base: baseSet ? (baseSet.article_id || []) : null },
+          { key: 'comment_id', label: '評測心得 (comment_id)', cur: (metrics.comment_id || []), base: baseSet ? (baseSet.comment_id || []) : null },
+          { key: 'lecture_id', label: '體驗直播 (lecture_id)', cur: (metrics.lecture_id || []), base: baseSet ? (baseSet.lecture_id || []) : null },
+          { key: 'edm', label: '會員EDM (edm)', cur: (metrics.edm || []), base: baseSet ? (baseSet.edm || []) : null },
+          { key: 'course', label: '產品專題 (subject)', cur: courseCur, base: courseBase }
+        ];
+
+        let html = '<table class="heatmap"><thead><tr>' +
+          '<th style="width:140px">category</th>' +
+          '<th style="width:180px">瀏覽次數</th>' +
+          '<th style="width:180px">比較瀏覽次數</th>' +
+          '<th class="ga4-only" style="width:160px">參與率</th>' +
+          '<th class="ga4-only" style="width:160px">Avg Sec</th>' +
+          '</tr></thead><tbody>';
+
+        defs.forEach(d => {
+          const cur = sumPanel(d.cur);
+          const base = d.base ? sumPanel(d.base) : null;
+
+          const curViews = (cur.views || 0).toLocaleString();
+          const curER = ((cur.er || 0) * 100).toFixed(1) + '%';
+          const curSec = Math.round(cur.sec || 0);
+
+          const baseViewsTxt = base ? (base.views || 0).toLocaleString() : '-';
+
+          const dViewsAbs = base ? (cur.views - base.views) : null;
+          let dViewsPct = null;
+          if (base) {
+            if (base.views > 0) dViewsPct = dViewsAbs / base.views;
+            else if (base.views === 0 && cur.views > 0) dViewsPct = Infinity;
+            else dViewsPct = 0;
+          }
+
+          const dER = (base && base.er > 0) ? (cur.er - base.er) : null;
+          const dSec = (base && base.sec > 0) ? (cur.sec - base.sec) / base.sec : null;
+
+          // 「總計」是分類層級，維持原規則（若你也想在總計遇到 0 基準時不顯示 %，再跟我說）
+          html += '<tr>' +
+            `<td>${esc(d.label)}</td>` +
+            `<td>${curViews}${base ? `<div>${isPctMode ? bdgPct(dViewsPct) : bdgNum(dViewsAbs)}</div>` : ''}</td>` +
+            `<td>${base ? baseViewsTxt : '-'}</td>` +
+            `<td class="ga4-only">${curER}${dER !== null ? `<div>${bdgPct(dER)}</div>` : ''}</td>` +
+            `<td class="ga4-only">${curSec}${dSec !== null ? `<div>${bdgPct(dSec)}</div>` : ''}</td>` +
+            '</tr>';
+        });
+
+        html += '</tbody></table>';
+        host.innerHTML = html;
+      })();
+
+      // 觸發診斷清單更新
+      try {
+        renderDiagnostics();
+      } catch (e) {
+        console.error('更新診斷清單失敗:', e);
+      }
+
+      // GSC 熱門搜尋字改用後端 API 直接載入
+      try {
+        fillGscQueries();
+      } catch (e) {
+        console.error('更新 GSC 熱門搜尋字失敗:', e);
+      }
+    }
+
+    /* --------------------- GSC 熱門搜尋字頁籤渲染與展開 --------------------- */
+    async function fillGscQueries() {
+      const host = document.querySelector('[data-panel="gsc_queries"]');
+      if (!host) return;
+
+      host.innerHTML = '<div class="muted" style="padding:20px;text-align:center;">正在從 Search Console 載入熱門搜尋關鍵字...</div>';
+
+      try {
+        const range = $('#sel-range').value || '28d';
+        const product = $('#sel-product').value || '';
+        const detail = getSelectedDetail();
+        const res = await callAPI({
+          type: 'gsc_top_queries',
+          k: range,
+          product: product,
+          product_detail: detail,
+          productDetail: detail
+        });
+        if (!res || !res.ok || !res.queries) throw new Error(res?.error || '載入失敗');
+
+        const queryList = res.queries || [];
+        if (queryList.length === 0) {
+          host.innerHTML = '<div class="muted" style="padding:20px;text-align:center;">該期間內無搜尋關鍵字資料</div>';
+          window.__gscQueryList = [];
+          return;
+        }
+
+        let totClicks = 0, totImpr = 0, totPosSum = 0, totPosCount = 0;
+        queryList.forEach(q => {
+          totClicks += q.clicks;
+          totImpr += q.impressions;
+          if (q.position > 0 && q.clicks > 0) {
+            totPosSum += q.position * q.clicks;
+            totPosCount += q.clicks;
+          }
+        });
+        let totPos = totPosCount ? totPosSum / totPosCount : 0;
+        let totCtr = totImpr ? (totClicks / totImpr) : 0;
+
+        const totalRowHtml = `
+        <tr class="sum">
+          <td>合計</td>
+          <td>${(totImpr || 0).toLocaleString()}</td>
+          <td>${(totClicks || 0).toLocaleString()}</td>
+          <td>${(totCtr * 100).toFixed(2)}%</td>
+          <td>${totPos > 0 ? totPos.toFixed(1) : '—'}</td>
+        </tr>`;
+
+        // 根據全域 SORT_MODE 排序
+        const sortMode = (typeof SORT_MODE !== 'undefined' && SORT_MODE.startsWith('gsc_')) ? SORT_MODE : 'gsc_clicks_desc';
+
+        queryList.sort((a, b) => {
+          if (sortMode === 'gsc_impr_desc') return b.impressions - a.impressions;
+          if (sortMode === 'gsc_impr_asc') return a.impressions - b.impressions;
+          if (sortMode === 'gsc_clicks_desc') return b.clicks - a.clicks;
+          if (sortMode === 'gsc_clicks_asc') return a.clicks - b.clicks;
+          if (sortMode === 'gsc_ctr_desc') return b.ctr - a.ctr;
+          if (sortMode === 'gsc_ctr_asc') return a.ctr - b.ctr;
+          if (sortMode === 'gsc_pos_desc') return b.position - a.position;
+          if (sortMode === 'gsc_pos_asc') {
+            const pA = a.position > 0 ? a.position : Infinity;
+            const pB = b.position > 0 ? b.position : Infinity;
+            return pA - pB;
+          }
+          return b.clicks - a.clicks;
+        });
+
+        const rowsHtml = queryList.map((x, idx) => {
+          return `
+          <tr class="clickable-row" data-query-row="${idx}" onclick="toggleGscQueryBreakdown(this, ${idx})">
+            <td style="font-weight:bold; color:#2563eb; text-align:left;">🔍 ${esc(x.query)}</td>
+            <td>${x.impressions.toLocaleString()}</td>
+            <td>${x.clicks.toLocaleString()}</td>
+            <td>${(x.ctr * 100).toFixed(2)}%</td>
+            <td>${x.position.toFixed(1)}</td>
+          </tr>`;
+        }).join('');
+
+        const getTh = (colModeDesc, colModeAsc, label, width) => {
+          let arrow = '';
+          let nextMode = colModeDesc;
+          if (sortMode === colModeDesc) { arrow = ' 🔽'; nextMode = colModeAsc; }
+          else if (sortMode === colModeAsc) { arrow = ' 🔼'; nextMode = colModeDesc; }
+
+          if (colModeAsc === 'gsc_pos_asc') {
+            nextMode = 'gsc_pos_asc';
+            if (sortMode === 'gsc_pos_asc') { arrow = ' 🔼'; nextMode = 'gsc_pos_desc'; }
+            else if (sortMode === 'gsc_pos_desc') { arrow = ' 🔽'; nextMode = 'gsc_pos_asc'; }
+          }
+          return `<th style="width:${width}; cursor:pointer; user-select:none;" onclick="window.handleSortClick('${nextMode}')">${label}${arrow}</th>`;
+        };
+
+        host.innerHTML = `
+        <table class="heatmap">
+          <thead>
+            <tr>
+              <th style="text-align:left;">熱門搜尋關鍵字 (Query)</th>
+              ${getTh('gsc_impr_desc', 'gsc_impr_asc', '曝光', '140px')}
+              ${getTh('gsc_clicks_desc', 'gsc_clicks_asc', '點擊', '140px')}
+              ${getTh('gsc_ctr_desc', 'gsc_ctr_asc', 'CTR', '120px')}
+              ${getTh('gsc_pos_desc', 'gsc_pos_asc', '排名', '100px')}
+            </tr>
+          </thead>
+          <tbody>
+            ${totalRowHtml}
+            ${rowsHtml || '<tr><td colspan="5" class="muted">無熱門搜尋字資料</td></tr>'}
+          </tbody>
+        </table>`;
+
+        window.__gscQueryList = queryList;
+      } catch (err) {
+        host.innerHTML = `<div class="muted" style="padding:20px;text-align:center;color:var(--neg);">載入 GSC 搜尋關鍵字失敗: ${err.message}</div>`;
+        window.__gscQueryList = [];
+      }
+    }
+
+    async function toggleGscQueryBreakdown(tr, idx) {
+      const next = tr.nextElementSibling;
+      if (next && next.classList.contains('composition-row')) {
+        next.remove();
+        return;
+      }
+
+      const queryData = window.__gscQueryList ? window.__gscQueryList[idx] : null;
+      if (!queryData) return;
+
+      const newTr = document.createElement('tr');
+      newTr.className = 'composition-row';
+      newTr.innerHTML = `<td colspan="6"><div class="comp-box"><div class="muted">相關網頁載入中...</div></div></td>`;
+      tr.after(newTr);
+
+      try {
+        const range = $('#sel-range').value || '28d';
+        const product = $('#sel-product').value || '';
+        const detail = getSelectedDetail();
+
+        const res = await callAPI({
+          type: 'query_pages',
+          k: range,
+          query: queryData.query,
+          product: product,
+          product_detail: detail,
+          productDetail: detail
+        });
+
+        if (!res || !res.ok || !res.pages) throw new Error(res?.error || '載入失敗');
+
+        const pagesList = res.pages || [];
+        const esc = (s) => String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        const pagesHtml = pagesList.map(p => {
+          return `
+          <tr>
+            <td><code>${esc(p.category)}</code></td>
+            <td><b>${esc(p.id)}</b></td>
+            <td style="text-align:left;">${esc(p.title)}</td>
+            <td style="text-align:right;">${p.impressions.toLocaleString()}</td>
+            <td style="text-align:right;">${p.clicks.toLocaleString()}</td>
+            <td style="text-align:right;">${(p.ctr * 100).toFixed(2)}%</td>
+            <td style="text-align:right;">${p.position.toFixed(1)}</td>
+          </tr>`;
+        }).join('');
+
+        newTr.innerHTML = `
+        <td colspan="6">
+          <div class="comp-box">
+            <div class="comp-title">📄 使用此關鍵字帶來流量的網頁列表</div>
+            <table class="comp-table">
+              <thead>
+                <tr>
+                  <th>分類</th>
+                  <th>頁面ID</th>
+                  <th style="text-align:left;">網頁名稱</th>
+                  <th style="text-align:right;">曝光</th>
+                  <th style="text-align:right;">點擊</th>
+                  <th style="text-align:right;">CTR</th>
+                  <th style="text-align:right;">排名</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pagesHtml || '<tr><td colspan="7" class="muted">無網頁對應資料</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </td>`;
+      } catch (err) {
+        newTr.innerHTML = `<td colspan="5"><div class="comp-box"><div class="muted" style="color:var(--neg);">載入網頁列表失敗: ${err.message}</div></div></td>`;
+      }
+    }
+
+
+    async function openQueryModal(pageUrl, category, id) {
+      const modal = document.getElementById('query-modal');
+      const body = document.getElementById('query-modal-body');
+      const title = document.getElementById('query-modal-title');
+      modal.style.display = 'flex';
+      body.innerHTML = '<div style="text-align:center; padding:40px; color:#cbd5e1; font-size:16px;">載入中... 請稍候 (正在向 GSC 查詢當期與去年同期關鍵字資料)</div>';
+      if (pageUrl) {
+        let href = pageUrl.startsWith('http') ? pageUrl : (pageUrl.startsWith('/') ? 'https://demo.example.com' + pageUrl : pageUrl);
+        title.innerHTML = `關鍵字 YoY 分析 - <a href="${esc(href)}" target="_blank" style="color:#60a5fa; text-decoration:underline; font-size:16px;">${esc(pageUrl)}</a>`;
+      } else {
+        title.innerText = '關鍵字 YoY 分析 - ' + id;
+      }
+
+      const range = document.getElementById('sel-range').value || '28d';
+
+      try {
+        const res = await callAPI({
+          type: 'page_queries',
+          k: range,
+          category: category,
+          id: id,
+          page_url: pageUrl
+        });
+        if (!res || !res.ok) throw new Error(res?.error || 'API 錯誤');
+
+        const queries = res.queries || [];
+        if (queries.length === 0) {
+          body.innerHTML = '<div style="text-align:center; padding:40px; color:#cbd5e1;">無搜尋關鍵字資料</div>';
+          return;
+        }
+
+        let trs = queries.map(q => {
+          let c_color = q.deltaClicks < 0 ? '#ef4444' : (q.deltaClicks > 0 ? '#22c55e' : '#94a3b8');
+          let i_color = q.deltaImpr < 0 ? '#ef4444' : (q.deltaImpr > 0 ? '#22c55e' : '#94a3b8');
+          let ctr_diff = (q.deltaCtr * 100).toFixed(1);
+          let ctr_color = q.deltaCtr < 0 ? '#ef4444' : (q.deltaCtr > 0 ? '#22c55e' : '#94a3b8');
+          let pos_diff = q.deltaPos !== 0 ? (q.deltaPos > 0 ? '+' : '') + q.deltaPos.toFixed(1) : '0.0';
+          let pos_color = q.deltaPos > 0 ? '#ef4444' : (q.deltaPos < 0 ? '#22c55e' : '#94a3b8');
+
+          return `<tr>
+            <td style="font-weight:bold;">${esc(q.query)}</td>
+            <td style="color:${c_color}; text-align:right;">${q.deltaClicks > 0 ? '+' : ''}${q.deltaClicks}</td>
+            <td style="color:${i_color}; text-align:right;">${q.deltaImpr > 0 ? '+' : ''}${q.deltaImpr}</td>
+            <td style="text-align:right;">${(q.ctr * 100).toFixed(1)}% <span style="font-size:11px; color:${ctr_color};">(${ctr_diff > 0 ? '+' : ''}${ctr_diff}%)</span></td>
+            <td style="text-align:right;">${q.position > 0 ? q.position.toFixed(1) : '-'} <span style="font-size:11px; color:${pos_color};">(${pos_diff})</span></td>
+            <td><span style="display:inline-block; padding:2px 6px; border-radius:4px; font-size:12px; background:#334155; color:#f8fafc;">${esc(q.judgement)}</span></td>
+          </tr>`;
+        }).join('');
+
+        body.innerHTML = `
+          <table class="comp-table" style="width:100%; font-size:14px;">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Query</th>
+                <th style="text-align:right;">點擊變化</th>
+                <th style="text-align:right;">曝光變化</th>
+                <th style="text-align:right;">當期 CTR (變化)</th>
+                <th style="text-align:right;">當期排名 (變化)</th>
+                <th style="text-align:left;">判斷</th>
+              </tr>
+            </thead>
+            <tbody>${trs}</tbody>
+          </table>
+        `;
+
+      } catch (e) {
+        body.innerHTML = `<div style="text-align:center; padding:40px; color:#ef4444;">發生錯誤: ${e.message}</div>`;
+      }
+    }
+
+
+    window.activeDiagArchFilters = [];
+    window.toggleDiagFilter = function (arch) {
+      if (window.activeDiagArchFilters.includes(arch)) {
+        window.activeDiagArchFilters = window.activeDiagArchFilters.filter(a => a !== arch);
+      } else {
+        window.activeDiagArchFilters.push(arch);
+      }
+      renderDiagnostics();
+    };
+
+    function renderDiagnostics() {
+      const tbody = document.getElementById('diag-tbody');
+      if (!tbody) return;
+
+      const product = document.getElementById('sel-product').value || '';
+      const detail = getSelectedDetail();
+      const groupUi = document.getElementById('sel-group').value || '';
+      const group = groupUi.replace(/^未分類$/, '');
+      const range = document.getElementById('sel-range').value || '28d';
+      const key = makeKey({ k: range, product, product_detail: detail, group });
+      const drill = FRONT_CACHE.drill.get(key);
+      const allData = drill ? drill.diagnosticsTop5 : [];
+
+      if (!allData || allData.length === 0) {
+        const debugMsg = drill ? (drill.diagnosticsTop5 ? "陣列為空" : "缺少 diagnosticsTop5 欄位") : "無 drill 資料";
+        tbody.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center;">無診斷異常資料 (Debug: ${debugMsg})</td></tr>`;
+        return;
+      }
+
+      const checkedCats = Array.from(document.querySelectorAll('#diag-filters input:checked')).map(el => el.value);
+
+      const filteredData = allData.filter(item => {
+        let cat = item.category;
+        if (cat === 'news_id') cat = 'news';
+        else if (cat === 'article_id') cat = 'article';
+        else if (cat === 'comment_id') cat = 'comment';
+        else if (cat === 'lecture_id') cat = 'lecture';
+        else if (cat === 'f_subject_no' || cat === 'subject_no') cat = 'course';
+
+        return checkedCats.includes(cat);
+      });
+
+      // 依照 archetype 分群，每個各取前 10 名
+      const grouped = {};
+      filteredData.forEach(item => {
+        if (!grouped[item.archetype]) grouped[item.archetype] = [];
+        grouped[item.archetype].push(item);
+      });
+
+      let finalDataToRender = [];
+      const archOrder = ["高價值流量流失", "排名衰退", "CTR不足", "高曝光低", "搜尋需求下降", "快進首頁"];
+
+      const isActive = (archStr) => {
+        if (!window.activeDiagArchFilters || window.activeDiagArchFilters.length === 0) return true;
+        return window.activeDiagArchFilters.some(a => archStr.includes(a));
+      };
+
+      archOrder.forEach(arch => {
+        if (grouped[arch] && isActive(arch)) {
+          finalDataToRender = finalDataToRender.concat(grouped[arch].slice(0, 10));
+        }
+      });
+      // 防呆：加上沒有列在 archOrder 裡的項目
+      Object.keys(grouped).forEach(arch => {
+        if (!archOrder.includes(arch) && isActive(arch)) {
+          finalDataToRender = finalDataToRender.concat(grouped[arch].slice(0, 10));
+        }
+      });
+
+      if (finalDataToRender.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center;">所選條件下目前無異常資料</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = finalDataToRender.map(item => {
+        let scoreBarColor = '#3b82f6';
+
+        if (item.archetype.includes('高價值流量流失')) scoreBarColor = '#a855f7'; // Purple
+        else if (item.archetype.includes('排名衰退') || item.archetype.includes('SEO 異常')) scoreBarColor = '#ef4444';
+
+        else if (item.archetype.includes('CTR不足') || item.archetype.includes('SERP')) scoreBarColor = '#f97316';
+        else if (item.archetype.includes('高曝光低')) scoreBarColor = '#eab308';
+        else if (item.archetype.includes('搜尋需求下降') || item.archetype.includes('正常')) scoreBarColor = '#6b7280';
+        else if (item.archetype.includes('快進首頁') || item.archetype.includes('臨門一腳')) scoreBarColor = '#22c55e';
+
+
+        return `
+          <tr class="clickable-row" onclick="openQueryModal('${esc(item.gscPageUrl)}', '${esc(item.category)}', '${esc(item.id)}')">
+            <td>
+              <div style="font-weight:bold; font-size:14px; margin-bottom:2px; color:#fff;">${item.score}/100</div>
+              <div style="width:100%; height:4px; background:#4b5563; border-radius:2px; overflow:hidden;">
+                <div style="width:${item.score}%; height:100%; background:${scoreBarColor};"></div>
+              </div>
+            </td>
+            <td>
+              <div style="font-weight:bold; line-height:1.2; margin-bottom:4px; white-space:normal; color:#fff;">${esc(item.name || item.id)}</div>
+              <div style="font-size:12px; color:#ccc;">
+                ${(() => {
+            let arch = item.archetype || '';
+            if (arch.includes('高價值流量流失')) {
+              return `<span style="color:#ef4444">點擊差額: ${item.deltaClicks}</span> &nbsp;|&nbsp; <span style="color:#94a3b8">曝光差額: ${item.deltaImpr}</span>`;
+            } else if (arch.includes('排名衰退') || arch.includes('SEO 異常')) {
+              return `排名: 第 ${(item.gscPosition || 0).toFixed(1)} 名 &nbsp;|&nbsp; <span style="color:#ef4444">點擊差額: ${item.deltaClicks}</span>`;
+            } else if (arch.includes('CTR不足')) {
+              return `目前 CTR: ${((item.gscCtr || 0) * 100).toFixed(2)}% &nbsp;|&nbsp; <span style="color:#f97316">點擊差額: ${item.deltaClicks}</span>`;
+            } else if (arch.includes('高曝光低')) {
+              return `曝光量: <span style="color:#eab308">${(item.gscImpressions || 0).toLocaleString()}</span> &nbsp;|&nbsp; 點擊: ${item.gscClicks || 0}`;
+            } else if (arch.includes('搜尋需求下降')) {
+              return `<span style="color:#94a3b8">曝光差額: ${item.deltaImpr}</span>`;
+            } else if (arch.includes('快進首頁') || arch.includes('臨門一腳')) {
+              return `目前排名: 第 <span style="color:#22c55e">${(item.gscPosition || 0).toFixed(1)}</span> 名 &nbsp;|&nbsp; <span style="color:#22c55e">點擊成長: +${item.deltaClicks}</span>`;
+            }
+            return `排名: 第 ${(item.gscPosition || 0).toFixed(1)} 名`;
+          })()}
+              </div>
+            </td>
+            <td style="color:${scoreBarColor}; font-weight:bold; font-size:13px;">
+              ${esc(item.archetype)}
+            </td>
+            <td style="font-size:13px; color:#ccc;">
+              ${esc(item.gscPhenomenon)}
+            </td>
+            <td style="font-size:13px;">
+              <span style="display:inline-block; padding:4px 8px; border-radius:4px; background:#f3f4f6; color:#1f2937; font-weight:bold;">${esc(item.priorityAction)}</span>
+            </td>
+          </tr>
+        `;
+
+      }).join('');
+
+      // ====== 繪製 Summary Cards & ECharts ======
+      const cardsContainer = document.getElementById('diag-summary-cards');
+      const echartsContainer = document.getElementById('diag-echarts-container');
+
+      if (cardsContainer && echartsContainer) {
+        if (filteredData.length > 0) {
+          cardsContainer.style.display = 'grid';
+          echartsContainer.style.display = 'block';
+
+          // 統計數據
+          const stats = {};
+          archOrder.forEach(a => stats[a] = { count: 0, clickLoss: 0, imprLoss: 0 });
+
+          filteredData.forEach(item => {
+            let archMatched = false;
+            archOrder.forEach(a => {
+              if (item.archetype.includes(a)) {
+                stats[a].count++;
+                if (item.deltaClicks < 0) stats[a].clickLoss += Math.abs(item.deltaClicks);
+                if (item.deltaImpr < 0) stats[a].imprLoss += Math.abs(item.deltaImpr);
+                archMatched = true;
+              }
+            });
+            if (!archMatched) {
+              if (!stats['其他']) stats['其他'] = { count: 0, clickLoss: 0, imprLoss: 0 };
+              stats['其他'].count++;
+              if (item.deltaClicks < 0) stats['其他'].clickLoss += Math.abs(item.deltaClicks);
+            }
+          });
+
+          let cardsHtml = '';
+          const archColors = {
+            '高價值流量流失': { bg: '#3b0764', border: '#7e22ce', text: '#d8b4fe' }, // purple
+            '排名衰退': { bg: '#450a0a', border: '#b91c1c', text: '#fca5a5' }, // red
+            'CTR不足': { bg: '#431407', border: '#c2410c', text: '#fdba74' }, // orange
+            '高曝光低': { bg: '#422006', border: '#b45309', text: '#fcd34d' }, // yellow
+            '搜尋需求下降': { bg: '#1f2937', border: '#4b5563', text: '#d1d5db' }, // gray
+            '快進首頁': { bg: '#052e16', border: '#15803d', text: '#86efac' }  // green
+          };
+
+          Object.keys(stats).forEach(arch => {
+            if (stats[arch].count > 0) {
+              const color = archColors[arch] || archColors['搜尋需求下降'];
+              let lossText = arch === '快進首頁' ? `總曝光: ${(stats[arch].imprLoss || 0).toLocaleString()}` : `流失點擊: ${stats[arch].clickLoss.toLocaleString()}`;
+              if (arch === '高價值流量流失') lossText = `流失點擊: ${stats[arch].clickLoss.toLocaleString()}`;
+
+              let shortName = arch;
+              if (arch === '高價值流量流失') shortName = '💎 高價值流失';
+              else if (arch === '排名衰退') shortName = '🚨 排名衰退';
+              else if (arch === 'CTR不足') shortName = '⚠️ CTR 不足';
+              else if (arch === '高曝光低') shortName = '👀 高曝光低 CTR';
+              else if (arch === '搜尋需求下降') shortName = '❄️ 需求下降';
+              else if (arch === '快進首頁') shortName = '🚀 臨門一腳';
+
+              let isSelected = window.activeDiagArchFilters.length === 0 || window.activeDiagArchFilters.includes(arch);
+              let opacity = isSelected ? 1 : 0.3;
+              let scale = isSelected ? 1 : 0.95;
+              cardsHtml += `
+                <div onclick="window.toggleDiagFilter('${arch}')" style="cursor:pointer; opacity:${opacity}; transform:scale(${scale}); transition:all 0.2s; background: ${color.bg}; border: 1px solid ${color.border}; border-radius: 8px; padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                  <div style="font-size:13px; font-weight:bold; color: ${color.text}; margin-bottom: 8px;">${shortName}</div>
+                  <div style="font-size:24px; font-weight:bold; color: #fff; margin-bottom: 4px;">${stats[arch].count} <span style="font-size:12px; font-weight:normal; color:#ccc;">篇</span></div>
+                  <div style="font-size:12px; color: ${color.text}; opacity: 0.8;">${lossText}</div>
+                </div>
+              `;
+            }
+          });
+          cardsContainer.innerHTML = cardsHtml;
+
+          // ECharts
+          if (!window.diagChart) {
+            window.diagChart = echarts.init(echartsContainer);
+            window.addEventListener('resize', () => window.diagChart.resize());
+          }
+
+          const seriesData = Object.keys(stats).filter(a => stats[a].count > 0).map((arch, idx) => {
+            const color = archColors[arch] || archColors['搜尋需求下降'];
+            const dataPts = filteredData.filter(item => item.archetype.includes(arch)).map(item => {
+              // Bubble size based on traffic impact
+              let loss = Math.abs(item.deltaClicks || 0);
+              let size = 12;
+              if (loss > 0) size = Math.min(40, Math.max(12, loss * 0.1));
+              if (item.deltaClicks > 0) size = Math.min(25, Math.max(12, item.deltaClicks * 0.05));
+
+              return {
+                value: [item.deltaClicks || 0, item.deltaImpr || 0, loss],
+                name: item.name || item.id,
+                url: item.gscPageUrl,
+                category: item.category,
+                id: item.id,
+                symbolSize: size
+              };
+            });
+
+            let isSevere = arch === '高價值流量流失';
+
+            let seriesConfig = {
+              name: arch,
+              type: isSevere ? 'effectScatter' : 'scatter',
+              data: dataPts,
+              itemStyle: {
+                color: color.text,
+                shadowBlur: isSevere ? 10 : 0,
+                shadowColor: color.text,
+                opacity: 0.8
+              },
+              symbolSize: function (data, params) {
+                return params.data.symbolSize || 12;
+              }
+            };
+
+            // Add Quadrant backgrounds to the first series
+            if (idx === 0) {
+              seriesConfig.markArea = {
+                silent: true,
+                data: [
+                  [
+                    { xAxis: 0, yAxis: 0, itemStyle: { color: 'rgba(34, 197, 94, 0.05)' } },
+                    { xAxis: 'max', yAxis: 'max' }
+                  ],
+                  [
+                    { xAxis: 'min', yAxis: 'min', itemStyle: { color: 'rgba(239, 68, 68, 0.05)' } },
+                    { xAxis: 0, yAxis: 0 }
+                  ]
+                ]
+              };
+              seriesConfig.markLine = {
+                silent: true,
+                symbol: 'none',
+                lineStyle: { type: 'solid', color: '#475569', width: 1 },
+                data: [{ xAxis: 0 }, { yAxis: 0 }]
+              };
+            }
+            return seriesConfig;
+          });
+
+          const option = {
+            backgroundColor: 'transparent',
+            tooltip: {
+              trigger: 'item',
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              borderColor: '#475569',
+              borderWidth: 1,
+              padding: 12,
+              textStyle: { color: '#f8fafc', fontSize: 13 },
+              axisPointer: {
+                type: 'cross',
+                crossStyle: { color: '#94a3b8', type: 'dashed' }
+              },
+              formatter: function (params) {
+                let signC = params.value[0] > 0 ? '+' : '';
+                let signI = params.value[1] > 0 ? '+' : '';
+                return `<div style="max-width:280px; white-space:normal; word-wrap:break-word;">
+                          <div style="font-weight:bold; color:${params.color}; margin-bottom:6px; font-size:14px;">${params.seriesName}</div>
+                          <div style="margin-bottom:8px; line-height:1.4; color:#e2e8f0;">${params.data.name}</div>
+                          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                             <span style="color:#94a3b8;">點擊差額 (YoY):</span>
+                             <span style="font-weight:bold; color:${params.value[0] < 0 ? '#f87171' : '#4ade80'}">${signC}${params.value[0]}</span>
+                          </div>
+                          <div style="display:flex; justify-content:space-between;">
+                             <span style="color:#94a3b8;">曝光差額 (YoY):</span>
+                             <span style="font-weight:bold; color:${params.value[1] < 0 ? '#f87171' : '#4ade80'}">${signI}${params.value[1]}</span>
+                          </div>
+                        </div>`;
+              }
+            },
+            legend: {
+              data: seriesData.map(s => s.name),
+              textStyle: { color: '#cbd5e1', fontSize: 13 },
+              bottom: 0,
+              icon: 'circle',
+              selected: (function () {
+                let sel = {};
+                if (window.activeDiagArchFilters && window.activeDiagArchFilters.length > 0) {
+                  seriesData.forEach(s => { sel[s.name] = window.activeDiagArchFilters.includes(s.name); });
+                }
+                return sel;
+              })()
+            },
+            dataZoom: [
+              { type: 'inside', xAxisIndex: 0, filterMode: 'empty' },
+              { type: 'inside', yAxisIndex: 0, filterMode: 'empty' }
+            ],
+            toolbox: {
+              feature: {
+                dataZoom: { yAxisIndex: 'none', title: { zoom: '區域縮放', back: '區域還原' } },
+                restore: { title: '視角還原' }
+              },
+              iconStyle: { borderColor: '#94a3b8' },
+              right: 15,
+              top: 0
+            },
+            grid: { top: 40, right: 40, bottom: 60, left: 60 },
+            xAxis: {
+              type: 'value',
+              name: '點擊差額 ( YoY )',
+              nameLocation: 'middle',
+              nameGap: 30,
+              nameTextStyle: { color: '#94a3b8', fontSize: 13 },
+              splitLine: { lineStyle: { type: 'dashed', color: 'rgba(51,65,85,0.4)' } },
+              axisLabel: { color: '#94a3b8' }
+            },
+            yAxis: {
+              type: 'value',
+              name: '曝光差額 ( YoY )',
+              nameLocation: 'middle',
+              nameGap: 45,
+              nameTextStyle: { color: '#94a3b8', fontSize: 13 },
+              splitLine: { lineStyle: { type: 'dashed', color: 'rgba(51,65,85,0.4)' } },
+              axisLabel: { color: '#94a3b8' }
+            },
+            series: seriesData
+          };
+
+          window.diagChart.setOption(option, true);
+
+          // Force resize after reflow to fix layout issues when container changes from display: none to block
+          setTimeout(() => {
+            if (window.diagChart) window.diagChart.resize();
+          }, 10);
+
+          // ECharts click event to open Query Modal
+          window.diagChart.off('click');
+          window.diagChart.on('click', function (params) {
+            openQueryModal(params.data.url, params.data.category, params.data.id);
+          });
+
+        } else {
+          cardsContainer.style.display = 'none';
+          echartsContainer.style.display = 'none';
+        }
+      }
+    }
+
+    function scrollToPageRow(category, id) {
+      let tabKey = category;
+      if (category === 'f_subject_no' || category === 'subject_no') {
+        tabKey = 'course';
+      } else if (category === 'news_id') tabKey = 'news';
+      else if (category === 'article_id') tabKey = 'article';
+      else if (category === 'comment_id') tabKey = 'comment';
+      else if (category === 'lecture_id') tabKey = 'lecture';
+
+      switchTab(tabKey);
+
+      setTimeout(() => {
+        const rowEl = document.querySelector(`tr[data-id="${id}"][data-cat="${category}"]`);
+        if (rowEl) {
+          rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const next = rowEl.nextElementSibling;
+          if (!next || !next.classList.contains('composition-row')) {
+            rowEl.click();
+          }
+        }
+      }, 150);
+    }
+
+
+
+
+
+
+    /* --------------------- 綁定事件 & 啟動 --------------------- */
+
+    // 產品選單改變：先重建小分類，再刷新
+    function onProductChange() {
+      const prod = (document.getElementById('sel-product')?.value || '');
+      const keep = getSelectedDetail();
+      rebuildProductDetailSelect(LATEST_FILTERS, prod, keep);
+      refreshAll();
+    }
+
+    function updateSortControlsUI() {
+      const selGa4 = document.getElementById('sel-sort-ga4');
+      const selGsc = document.getElementById('sel-sort-gsc');
+      const compareMode = (document.getElementById('sel-compare')?.value || 'none');
+      const noBase = (compareMode === 'none');
+
+      if (selGa4) {
+        Array.from(selGa4.options).forEach(opt => {
+          const isDelta = opt.value !== 'views_desc';
+          opt.disabled = noBase && isDelta;
+        });
+        if (noBase && selGa4.value !== 'views_desc') {
+          selGa4.value = 'views_desc';
+          if (SORT_MODE.startsWith('drop_') || SORT_MODE.startsWith('rise_')) SORT_MODE = 'views_desc';
+        }
+      }
+    }
+
+
+
+    /**
+     * 切換顯示單篇頁面的流量組成與 GSC 關鍵字
+     */
+    async function togglePageBreakdown(tr, id, category, gscPageUrl) {
+      const next = tr.nextElementSibling;
+      if (next && next.classList.contains('composition-row')) {
+        next.remove();
+        return;
+      }
+
+      // 動態取得當前表格的可見欄位數，避免 colspan 錯誤導致表格縮放
+      const isGscMode = document.body.classList.contains('mode-gsc');
+      const colCount = isGscMode ? 6 : 5;
+
+      // 插入載入中提示
+      const newTr = document.createElement('tr');
+      newTr.className = 'composition-row';
+      newTr.innerHTML = `<td colspan="${colCount}"><div class="comp-box"><div class="muted">來源組成載入中...</div></div></td>`;
+      tr.after(newTr);
+
+      try {
+        const range = $('#sel-range').value || '28d';
+        const product = $('#sel-product').value || '';
+        const detail = getSelectedDetail();
+
+        // 前端快取 Key
+        const cacheKey = JSON.stringify({ k: range, id, category, product, product_detail: detail });
+        let res;
+
+        if (FRONT_CACHE.breakdowns.has(cacheKey)) {
+          res = FRONT_CACHE.breakdowns.get(cacheKey);
+        } else {
+          res = await callAPI({ type: 'breakdown', k: range, id: id, category: category, product, product_detail: detail });
+          if (res && res.ok && res.breakdown) {
+            FRONT_CACHE.breakdowns.set(cacheKey, res);
+          }
+        }
+
+        if (!res || !res.ok || !res.breakdown) throw new Error('載入失敗');
+
+        const totalViews = res.breakdown.reduce((s, x) => s + x.views, 0);
+        let rowsHtml = res.breakdown.map(r => {
+          const p = totalViews > 0 ? (r.views / totalViews) : 0;
+          return `<tr>
+            <td style="width:120px">${esc(r.group)}</td>
+            <td>${esc(r.source)}</td>
+            <td style="width:80px;text-align:right">${r.views.toLocaleString()}</td>
+            <td style="width:100px;text-align:right">
+              ${(p * 100).toFixed(1)}% 
+              <div class="comp-bar-bg"><div class="comp-bar-fill" style="width:${p * 100}%"></div></div>
+            </td>
+          </tr>`;
+        }).join('');
+
+        newTr.innerHTML = `
+      <td colspan="${colCount}">
+        <div class="comp-box">
+          <!-- 分頁 Tab 按鈕 -->
+          <div class="comp-tabs">
+            <button class="comp-tab-btn ga4-only active" onclick="switchDetailSubTab(this, 'traffic')">📊 流量來源組成 (GA4)</button>
+            <button class="comp-tab-btn gsc-only active" onclick="switchDetailSubTab(this, 'seo', '${esc(id)}', '${esc(category)}', '${esc(gscPageUrl)}')">🔍 GSC 熱門搜尋字</button>
+          </div>
+          
+          <!-- GA4 流量組成 Panel -->
+          <div class="sub-tab-panel ga4-only" data-sub-panel="traffic" style="display:block;">
+            <table class="comp-table">
+              <thead>
+                <tr><th>來源群組</th><th>來源細分</th><th style="text-align:right">瀏覽次數</th><th style="text-align:right">占比</th></tr>
+              </thead>
+              <tbody>${rowsHtml || '<tr><td colspan="4">無資料</td></tr>'}</tbody>
+            </table>
+          </div>
+          
+          <!-- GSC SEO Panel -->
+          <div class="sub-tab-panel gsc-only" data-sub-panel="seo" style="display:block;">
+            <div class="muted">GSC 關鍵字載入中...</div>
+          </div>
+        </div>
+      </td>`;
+
+        // 如果當前是 GSC 模式，主動幫它載入 SEO 數據（因為一展開就是 SEO 面板）
+        if (document.body.classList.contains('mode-gsc')) {
+          const seoBtn = newTr.querySelector('.comp-tab-btn.gsc-only');
+          if (seoBtn) {
+            switchDetailSubTab(seoBtn, 'seo', id, category, gscPageUrl);
+          }
+        }
+      } catch (err) {
+        newTr.innerHTML = `<td colspan="9"><div class="comp-box"><div class="muted" style="color:var(--neg)">${err.message}</div></div></td>`;
+      }
+    }
+
+    /**
+     * 子分頁切換邏輯
+     */
+    async function switchDetailSubTab(btn, tabName, id, category, gscPageUrl) {
+      const compBox = btn.closest('.comp-box');
+      if (!compBox) return;
+
+      // 1. 切換按鈕 active 樣式
+      const btns = compBox.querySelectorAll('.comp-tab-btn');
+      btns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // 2. 切換 panel 顯示
+      const panels = compBox.querySelectorAll('.sub-tab-panel');
+      panels.forEach(p => {
+        p.style.display = p.dataset.subPanel === tabName ? 'block' : 'none';
+      });
+
+      // 3. 如果是切換到 SEO (GSC) 且尚未載入過資料，則進行 AJAX 撈取
+      if (tabName === 'seo') {
+        const seoPanel = compBox.querySelector('[data-sub-panel="seo"]');
+        if (seoPanel && (seoPanel.innerHTML.includes('載入中') || seoPanel.innerHTML.includes('無關鍵字資料') || seoPanel.innerHTML.includes('無 GSC 搜尋'))) {
+          try {
+            const range = $('#sel-range').value || '28d';
+
+            const params = {
+              type: 'page_queries',
+              k: range,
+              page_url: gscPageUrl,
+              id: id,
+              category: category
+            };
+
+            const res = await callAPI(params);
+            if (!res || !res.ok || !res.queries) throw new Error('撈取關鍵字失敗');
+
+            const queries = res.queries || [];
+            if (queries.length === 0) {
+              seoPanel.innerHTML = '<div class="muted" style="padding:10px;">該網頁在此期間內無 GSC 搜尋關鍵字資料（可能點擊數未達門檻）</div>';
+              return;
+            }
+
+            // 將抓取到的關鍵字暫存到記憶體，以便前端點擊欄位可直接排序
+            window.innerGscQueriesCache = window.innerGscQueriesCache || {};
+            window.innerGscQueriesCache[id] = queries;
+
+            // 預設排序模式 (第一次載入)
+            const defaultSortMode = (typeof SORT_MODE !== 'undefined' && SORT_MODE.startsWith('gsc_')) ? SORT_MODE : 'gsc_clicks_desc';
+
+            window.renderInnerGscTableFull = function (targetId, sortMode) {
+              const qs = window.innerGscQueriesCache[targetId];
+              if (!qs) return '';
+
+              qs.sort((a, b) => {
+                if (sortMode === 'gsc_impr_desc') return b.impressions - a.impressions;
+                if (sortMode === 'gsc_impr_asc') return a.impressions - b.impressions;
+                if (sortMode === 'gsc_clicks_desc') return b.clicks - a.clicks;
+                if (sortMode === 'gsc_clicks_asc') return a.clicks - b.clicks;
+                if (sortMode === 'gsc_ctr_desc') return b.ctr - a.ctr;
+                if (sortMode === 'gsc_ctr_asc') return a.ctr - b.ctr;
+                if (sortMode === 'gsc_pos_desc') return b.position - a.position;
+                if (sortMode === 'gsc_pos_asc') {
+                  const pA = a.position > 0 ? a.position : Infinity;
+                  const pB = b.position > 0 ? b.position : Infinity;
+                  return pA - pB;
+                }
+                return b.clicks - a.clicks;
+              });
+
+              const maxClicks = Math.max(...qs.map(q => q.clicks), 1);
+              const tbodyHtml = qs.map(q => {
+                const p = q.clicks / maxClicks;
+                return `<tr>
+                  <td style="font-weight:bold; color:#2563eb;">${esc(q.query)}</td>
+                  <td style="text-align:right;">${q.impressions.toLocaleString()}</td>
+                  <td style="text-align:right;">${q.clicks.toLocaleString()}</td>
+                  <td style="text-align:right;">${(q.ctr * 100).toFixed(2)}%</td>
+                  <td style="text-align:right;">${q.position.toFixed(1)}</td>
+                  <td style="width:120px; text-align:right;">
+                    <div class="comp-bar-bg" style="width:100px;"><div class="comp-bar-fill" style="width:${p * 100}%; background:#3b82f6;"></div></div>
+                  </td>
+                </tr>`;
+              }).join('');
+
+              const getTh = (colModeDesc, colModeAsc, label) => {
+                let arrow = '';
+                let nextMode = colModeDesc;
+                if (sortMode === colModeDesc) { arrow = ' 🔽'; nextMode = colModeAsc; }
+                else if (sortMode === colModeAsc) { arrow = ' 🔼'; nextMode = colModeDesc; }
+
+                // 特別處理「排名」：數字越小越好，預設 asc (前到後)
+                if (colModeAsc === 'gsc_pos_asc') {
+                  nextMode = 'gsc_pos_asc';
+                  if (sortMode === 'gsc_pos_asc') { arrow = ' 🔼'; nextMode = 'gsc_pos_desc'; }
+                  else if (sortMode === 'gsc_pos_desc') { arrow = ' 🔽'; nextMode = 'gsc_pos_asc'; }
+                }
+
+                return `<th style="text-align:right; cursor:pointer; user-select:none;" onclick="window.sortInnerGscTableTrigger(this.closest('table').dataset.id, '${nextMode}')">${label}${arrow}</th>`;
+              };
+
+              return `
+                <thead>
+                  <tr>
+                    <th>熱門搜尋關鍵字 (Query)</th>
+                    ${getTh('gsc_impr_desc', 'gsc_impr_asc', '曝光')}
+                    ${getTh('gsc_clicks_desc', 'gsc_clicks_asc', '點擊')}
+                    ${getTh('gsc_ctr_desc', 'gsc_ctr_asc', 'CTR')}
+                    ${getTh('gsc_pos_desc', 'gsc_pos_asc', '排名')}
+                    <th style="text-align:right; width:120px;">點擊比例</th>
+                  </tr>
+                </thead>
+                <tbody>${tbodyHtml}</tbody>
+              `;
+            };
+
+            window.sortInnerGscTableTrigger = function (targetId, mode) {
+              const table = document.getElementById('inner-gsc-table-' + targetId);
+              if (table) {
+                table.innerHTML = window.renderInnerGscTableFull(targetId, mode);
+              }
+            };
+
+            seoPanel.innerHTML = `
+              <table class="comp-table" id="inner-gsc-table-${esc(id)}" data-id="${esc(id)}">
+                ${window.renderInnerGscTableFull(id, defaultSortMode)}
+              </table>`;
+          } catch (err) {
+            seoPanel.innerHTML = `<div class="muted" style="color:var(--neg); padding:10px;">GSC 數據載入失敗: ${err.message}</div>`;
+          }
+        }
+      }
+    }
+
+    /**
+     * 綁定並執行 Excel 匯出
+     */
+    function bindExportButton() {
+      const btn = $('#btn-export');
+      if (!btn) return;
+
+      btn.addEventListener('click', async () => {
+        const product = $('#sel-product').value || '';
+        const detail = getSelectedDetail();
+        let range = $('#sel-range').value || '28d';
+        const compMode = document.getElementById('sel-compare')?.value || 'none';
+
+        if (compMode !== 'none') {
+          range = `${range}_${compMode}`;
+        }
+
+        btn.disabled = true;
+        const oldTxt = btn.textContent;
+        btn.textContent = ' 產製中...';
+
+        try {
+          const res = await callAPI({ type: 'export_data', k: range, product: product, product_detail: detail });
+          if (!res || !res.ok || !res.exportData) throw new Error('取得資料失敗');
+
+          // 1. 判斷是否有比較期間
+          const isComp = range.endsWith('_prev') || range.endsWith('_yoy');
+          const compLabel = range.endsWith('_yoy') ? "去年同期" : "前期";
+
+          // 2. 依 category + pageId 分組，計算每一組的總 Views，以便算出組成比例
+          const pageTotals = {};
+          res.exportData.forEach(x => {
+            const key = x.category + '|' + x.pageId;
+            pageTotals[key] = (pageTotals[key] || 0) + (x.views || 0);
+          });
+
+          // 3. 排序：依 頁面類別 > 頁面ID > Views (降序)
+          const sorted = res.exportData.sort((a, b) => {
+            if (a.category !== b.category) return a.category.localeCompare(b.category);
+            if (a.pageId !== b.pageId) return a.pageId.localeCompare(b.pageId);
+            return (b.views || 0) - (a.views || 0);
+          });
+
+          // 4. 準備 GA4 資料格式
+          const ga4Rows = sorted.map(x => {
+            const key = x.category + '|' + x.pageId;
+            const total = pageTotals[key] || 0;
+            const pctVal = total > 0 ? (x.views / total) : 0;
+            const rowData = {
+              '頁面類別': x.category,
+              '頁面ID': x.pageId,
+              '頁面名稱': x.pageName,
+              '來源群組': x.sourceGroup,
+              '來源名稱': x.sourceName,
+              '本期造訪次數': x.views
+            };
+            if (isComp) {
+              rowData[`${compLabel}造訪次數`] = x.views_prev || 0;
+              const diff = (x.views || 0) - (x.views_prev || 0);
+              rowData['差異'] = diff > 0 ? `+${diff}` : diff.toString();
+            } else {
+              rowData['造訪次數'] = x.views;
+              delete rowData['本期造訪次數'];
+            }
+            rowData['佔比 (%)'] = (pctVal * 100).toFixed(1) + '%';
+            return rowData;
+          });
+
+          // 5. 準備 GSC 資料格式
+          const gscSorted = (res.exportGscData || []).sort((a, b) => {
+            if (a.category !== b.category) return a.category.localeCompare(b.category);
+            if (a.pageId !== b.pageId) return String(a.pageId).localeCompare(String(b.pageId));
+            return (b.clicks || 0) - (a.clicks || 0);
+          });
+          const gscRows = gscSorted.map(x => {
+            const rowData = {
+              '頁面類別': x.category,
+              '頁面ID': x.pageId,
+              '頁面名稱': x.pageName,
+              '關鍵字 (Query)': x.query,
+            };
+            if (isComp) {
+              rowData['本期曝光'] = x.impressions;
+              rowData[`${compLabel}曝光`] = x.impressions_prev || 0;
+              rowData['本期點擊'] = x.clicks;
+              rowData[`${compLabel}點擊`] = x.clicks_prev || 0;
+              rowData['本期CTR'] = (x.ctr * 100).toFixed(2) + '%';
+              rowData[`${compLabel}CTR`] = ((x.ctr_prev || 0) * 100).toFixed(2) + '%';
+              rowData['本期排名'] = x.position > 0 ? x.position.toFixed(1) : '—';
+              rowData[`${compLabel}排名`] = x.position_prev > 0 ? x.position_prev.toFixed(1) : '—';
+            } else {
+              rowData['曝光'] = x.impressions;
+              rowData['點擊'] = x.clicks;
+              rowData['CTR'] = (x.ctr * 100).toFixed(2) + '%';
+              rowData['排名'] = x.position > 0 ? x.position.toFixed(1) : '—';
+            }
+            return rowData;
+          });
+
+          // 6. 透過 SheetJS 建立多工作表 Excel 檔案
+          const wb = XLSX.utils.book_new();
+
+          const wsGA4 = XLSX.utils.json_to_sheet(ga4Rows);
+          if (isComp) {
+            wsGA4['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 40 }, { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 10 }];
+          } else {
+            wsGA4['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 40 }, { wch: 15 }, { wch: 25 }, { wch: 10 }, { wch: 10 }];
+          }
+          XLSX.utils.book_append_sheet(wb, wsGA4, "GA4 流量組成");
+
+          if (gscRows.length > 0) {
+            const wsGSC = XLSX.utils.json_to_sheet(gscRows);
+            if (isComp) {
+              wsGSC['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 40 }, { wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
+            } else {
+              wsGSC['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 40 }, { wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
+            }
+            XLSX.utils.book_append_sheet(wb, wsGSC, "GSC 關鍵字資料");
+          } else {
+            const wsGSC = XLSX.utils.json_to_sheet([{ '訊息': '此條件下無 GSC 關鍵字資料或尚未連接 Search Console' }]);
+            wsGSC['!cols'] = [{ wch: 60 }];
+            XLSX.utils.book_append_sheet(wb, wsGSC, "GSC 關鍵字資料");
+          }
+
+          const fileName = `品質報表匯出_${product || '全產品'}_${range}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+          XLSX.writeFile(wb, fileName);
+
+          $('#msg').textContent = '狀態：匯出成功';
+        } catch (err) {
+          alert('匯出失敗：' + err.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = oldTxt;
+        }
+      });
+    }
+
+    // 綁定事件（存在才綁定）
+    function wireEvents() {
+      // 顯示模式切換按鈕事件監聽器
+      document.querySelectorAll('.mode-switch-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const mode = e.currentTarget.dataset.mode;
+          setDisplayMode(mode);
+        });
+      });
+
+      // 產品切換：同步重建小分類再刷新
+      const elProduct = document.getElementById('sel-product');
+      if (elProduct) elProduct.addEventListener('change', onProductChange);
+
+      // 小分類 / 來源群組 / 區間：直接刷新（會打 API）
+      const elDetail = document.getElementById('sel-prod-detail');
+      if (elDetail) elDetail.addEventListener('change', refreshAll);
+
+      const elGroup = document.getElementById('sel-group');
+      if (elGroup) elGroup.addEventListener('change', refreshAll);
+
+      const elRange = document.getElementById('sel-range');
+      if (elRange) elRange.addEventListener('change', refreshAll);
+
+      // 比較期間：只用快取重畫 + 更新排序選單可用狀態（秒切）
+      const elCompare = document.getElementById('sel-compare');
+      if (elCompare) elCompare.addEventListener('change', () => {
+        updateSortControlsUI();
+        rerenderFromCacheOnly();
+      });
+
+      // ★ 新增：排序選單（#sel-sort-ga4 & #sel-sort-gsc）
+      const elSortGa4 = document.getElementById('sel-sort-ga4');
+      const elSortGsc = document.getElementById('sel-sort-gsc');
+
+      if (elSortGa4) {
+        elSortGa4.addEventListener('change', (e) => {
+          SORT_MODE = e.target.value;
+          if (elSortGsc) elSortGsc.value = ""; // 重設另一個
+          rerenderFromCacheOnly();
+        });
+      }
+
+      if (elSortGsc) {
+        elSortGsc.addEventListener('change', (e) => {
+          if (!e.target.value) return;
+          SORT_MODE = e.target.value;
+          if (elSortGa4) elSortGa4.value = "views_desc"; // 重設 GA4
+          rerenderFromCacheOnly();
+        });
+      }
+
+      // 新增欄位點擊排序處理
+      window.handleSortClick = function (mode) {
+        if (typeof SORT_MODE !== 'undefined') {
+          if (SORT_MODE === mode) {
+            if (mode.endsWith('_desc')) mode = mode.replace('_desc', '_asc');
+            else if (mode.endsWith('_asc')) mode = mode.replace('_asc', '_desc');
+          }
+          SORT_MODE = mode;
+          const elSort = document.getElementById(mode.startsWith('gsc_') ? 'sel-sort-gsc' : 'sel-sort-ga4');
+          if (elSort) {
+            // 嘗試同步 UI dropdown, 若有符合選項
+            const opt = Array.from(elSort.options).find(o => o.value === mode);
+            if (opt) elSort.value = mode;
+          }
+          if (typeof rerenderFromCacheOnly === 'function') rerenderFromCacheOnly();
+        }
+      };
+
+      // 圓餅控制（來源 / 產品 維度切換）
+      const pieCard = document.getElementById('pie-card');
+      if (pieCard) {
+        pieCard.addEventListener('click', (e) => {
+          const chip = e.target.closest('[data-pie-dim]');
+          if (chip) {
+            PIE_DIM = chip.dataset.pieDim === 'product' ? 'product' : 'group';
+            updatePieControlsUI();
+            rerenderFromCacheOnly();
+          }
+        });
+      }
+      const btnPie = document.getElementById('btn-pie-toggle');
+      if (btnPie) btnPie.addEventListener('click', () => {
+        PIE_VIEW = (PIE_VIEW === 'chart') ? 'table' : 'chart';
+        updatePieControlsUI();
+        rerenderFromCacheOnly();
+      });
+
+      // 回到頁籤可見時，用快取快速重繪
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) { try { rerenderFromCacheOnly(); } catch (_) { } }
+      });
+
+      // 初始化控制元件外觀
+      updatePieControlsUI();
+      updateSortControlsUI();
+      bindExportButton();
+    }
+
+
+
+
+    // 啟動：DOM 就緒後再綁定 & 載入第一次資料
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        setDisplayMode('ga4');
+        wireEvents();
+        if (location.protocol === 'file:' || location.hostname.includes('github.io')) {
+          if (!CURRENT_EMP_ID) {
+            CURRENT_EMP_ID = 'DEMO001';
+            localStorage.setItem('emp_id', 'DEMO001');
+          }
+        }
+        updateUserInfoBadge();
+        if (!CURRENT_EMP_ID) {
+          showLoginModal();
+        } else {
+          await initAndLoad();
+        }
+      } catch (e) {
+        console.error('初始化失敗：', e);
+      }
+    });
+
+  </script>
+
+  <!-- Query Modal -->
+  <div id="query-modal"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+    <div
+      style="background:#1e293b; color:#f8fafc; width:90%; max-width:1000px; max-height:85vh; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,0.5); border:1px solid #334155;">
+      <div
+        style="padding:16px 20px; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center; background:#0f172a;">
+        <h3 id="query-modal-title" style="margin:0; color:#f8fafc;">網頁關鍵字 YoY 分析</h3>
+        <button onclick="document.getElementById('query-modal').style.display='none'"
+          style="border:none; background:none; font-size:24px; cursor:pointer; color:#94a3b8;">&times;</button>
+      </div>
+      <div id="query-modal-body" style="padding:20px; overflow-y:auto; flex:1;">
+        <div style="text-align:center; padding:40px; color:#cbd5e1;">載入中...</div>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>
