@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+env/
+.env
+
+# Build & Executable Artifacts
+build/
+dist/
+bi_dashboard/
+*.exe
+ngrok*/
+
+# Patch Scripts
+patch_app.py
+patch_ui.py
+
+# Google API Credentials & Service Accounts
+credentials.json
+token.json
+client_secrets.json
+backend/client_secrets.json
+service_account.json
+*.pem
+*.key
+
+# Snapshots, Logs, and Working Data
+backend/snapshots/
+backend/test_*.json
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
